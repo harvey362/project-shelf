@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Enhanced Drawing Canvas with Effects</title>
+<style>
+  :root{
+    --bg:#0b0f17; --panel:#121826; --ink:#eaf1ff; --muted:#9fb0d0; --accent:#5ce1e6; --good:#28d17c; --error:#ff4757;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 system-ui,Segoe UI,Inter,Roboto,sans-serif}
+  #wrap{display:grid;grid-template-columns:360px 1fr;gap:10px;height:100%;padding:10px}
+  aside{background:var(--panel);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:12px}
+  aside h1{font-size:16px;margin:0 0 2px 0}
+  label{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:8px}
+  input[type="range"]{width:100%}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  button{background:#1b253a;color:var(--ink);border:1px solid #2a3550;border-radius:10px;padding:8px 10px;cursor:pointer}
+  button:hover{filter:brightness(1.1)}
+  select{background:#101829;color:var(--ink);border:1px solid #2a3550;border-radius:8px;padding:6px}
+  #hud{font-size:12px;color:var(--muted)}
+  canvas{width:100%;height:100%;background:linear-gradient(#0f1422,#0b0f17);border-radius:14px;display:block}
+  kbd{background:#1a2338;border:1px solid #2a3550;border-bottom-color:#121a2e;padding:2px 6px;border-radius:6px}
+  .tool-group{border:1px solid #2a3550;padding:8px;border-radius:10px}
+  .color-picker{width:100%;height:40px;border:none;border-radius:8px;background:none}
+  .preset-colors{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:8px}
+  .preset-color{width:24px;height:24px;border-radius:4px;cursor:pointer;border:1px solid #2a3550}
+  .toggle-row{display:flex;gap:10px;align-items:center}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <aside>
+    <h1>Enhanced Drawing Studio</h1>
+    <div id="hud">LMB: draw/click · <kbd>Z</kbd> undo · <kbd>Shift+Z</kbd> redo · <kbd>C</kbd> clear · <kbd>S</kbd> save PNG · <kbd>A</kbd> Auto‑Shadow · <kbd>X</kbd> Shadow‑Ink · <kbd>B</kbd> Bucket</div>
+
+    <div class="tool-group">
+      <label>Drawing Tool
+        <select id="tool">
+          <option value="brush">Brush</option>
+          <option value="rect">Rectangle</option>
+          <option value="circle">Circle</option>
+          <option value="line">Line</option>
+          <option value="bucket">Fill Bucket</option>
+        </select>
+        <span></span>
+      </label>
+      <label>Brush Size
+        <input id="size" type="range" min="1" max="50" value="5"/>
+        <span id="sizeVal">5</span>
+      </label>
+      <label>Color
+        <input type="color" id="color" class="color-picker" value="#ffffff"/>
+        <span></span>
+      </label>
+      <div class="preset-colors" id="presetColors"></div>
+    </div>
+
+    <div class="tool-group">
+      <label>Shadow Type
+        <select id="mode">
+          <option value="cast">Cast Shadow</option>
+          <option value="mirror">Mirror Reflection</option>
+          <option value="both">Both</option>
+          <option value="none">None</option>
+        </select>
+        <span></span>
+      </label>
+      <label>Light Angle°
+        <input id="angle" type="range" min="0" max="360" value="45"/>
+        <span id="angleVal">45</span>
+      </label>
+      <label>Shadow Length
+        <input id="length" type="range" min="2" max="500" value="80"/>
+        <span id="lenVal">80</span>
+      </label>
+      <label>Shadow Opacity
+        <input id="alpha" type="range" min="0" max="100" value="35"/>
+        <span id="alphaVal">0.35</span>
+      </label>
+      <label>Blur (px)
+        <input id="blur" type="range" min="0" max="40" value="6"/>
+        <span id="blurVal">6</span>
+      </label>
+      <div class="toggle-row">
+        <label style="display:flex;align-items:center;gap:8px">Auto Shadow on New Strokes <input type="checkbox" id="autoShadow" checked></label>
+        <label style="display:flex;align-items:center;gap:8px">Shadow Ink (manual) <input type="checkbox" id="shadowInk"></label>
+      </div>
+    </div>
+
+    <div class="tool-group">
+      <label>Canvas Background
+        <select id="background">
+          <option value="dark">Dark</option>
+          <option value="light">Light</option>
+          <option value="transparent">Transparent</option>
+        </select>
+        <span></span>
+      </label>
+      <label>Show Grid
+        <input type="checkbox" id="showGrid"/>
+        <span></span>
+      </label>
+    </div>
+
+    <div class="tool-group">
+      <label>Bucket Tolerance
+        <input id="bucketTol" type="range" min="0" max="64" value="12"/>
+        <span id="bucketTolVal">12</span>
+      </label>
+      <label>Bucket Affects
+        <select id="bucketMode">
+          <option value="all">All pixels</option>
+          <option value="alphaOnly">Only transparent areas</option>
+        </select>
+        <span></span>
+      </label>
+    </div>
+
+    <div class="row">
+      <button id="undo">Undo</button>
+      <button id="redo">Redo</button>
+      <button id="clear">Clear</button>
+    </div>
+    <div class="row">
+      <button id="exportBtn">Export PNG</button>
+      <button id="saveBtn">Save Project</button>
+      <button id="loadBtn">Load Project</button>
+    </div>
+  </aside>
+  <canvas id="c"></canvas>
+</div>
+
+<script>
+// --- Constants & State
+const DPR = Math.max(1, window.devicePixelRatio || 1);
+const PRESET_COLORS = ['#ffffff','#ff4757','#28d17c','#5ce1e6','#ffd32a','#ff6b81'];
+
+const S = {
+  w:0, h:0, drawing:false, start:null, current:[],
+  // shape: {type, pts, color, size, autoShadow:boolean, shadowInk:boolean}
+  shapes:[], redo:[],
+};
+
+// --- UI refs
+const c = document.getElementById('c');
+const ctx = c.getContext('2d');
+const ui = {
+  tool: document.getElementById('tool'),
+  size: document.getElementById('size'), sizeVal: document.getElementById('sizeVal'),
+  color: document.getElementById('color'),
+  mode: document.getElementById('mode'),
+  angle: document.getElementById('angle'), angleVal: document.getElementById('angleVal'),
+  length: document.getElementById('length'), lenVal: document.getElementById('lenVal'),
+  alpha: document.getElementById('alpha'), alphaVal: document.getElementById('alphaVal'),
+  blur: document.getElementById('blur'), blurVal: document.getElementById('blurVal'),
+  autoShadow: document.getElementById('autoShadow'),
+  shadowInk: document.getElementById('shadowInk'),
+  bg: document.getElementById('background'),
+  grid: document.getElementById('showGrid'),
+  bucketTol: document.getElementById('bucketTol'), bucketTolVal: document.getElementById('bucketTolVal'),
+  bucketMode: document.getElementById('bucketMode'),
+  undo: document.getElementById('undo'), redo: document.getElementById('redo'), clear: document.getElementById('clear'),
+  exportBtn: document.getElementById('exportBtn'), saveBtn: document.getElementById('saveBtn'), loadBtn: document.getElementById('loadBtn')
+};
+
+// --- Init
+function init(){
+  const cont = document.getElementById('presetColors');
+  PRESET_COLORS.forEach(col=>{ const d=document.createElement('div'); d.className='preset-color'; d.style.backgroundColor=col; d.onclick=()=>ui.color.value=col; cont.appendChild(d); });
+
+  ui.size.addEventListener('input',()=>{ui.sizeVal.textContent=ui.size.value});
+  ui.sizeVal.textContent = ui.size.value;
+
+  ui.bucketTol.addEventListener('input',()=>{ui.bucketTolVal.textContent=ui.bucketTol.value});
+  ui.bucketTolVal.textContent = ui.bucketTol.value;
+
+  ['input','change'].forEach(ev=>{
+    ui.angle.addEventListener(ev,()=>{ui.angleVal.textContent=ui.angle.value; draw();});
+    ui.length.addEventListener(ev,()=>{ui.lenVal.textContent=ui.length.value; draw();});
+    ui.alpha.addEventListener(ev,()=>{ui.alphaVal.textContent=(ui.alpha.value/100).toFixed(2); draw();});
+    ui.blur.addEventListener(ev,()=>{ui.blurVal.textContent=ui.blur.value; draw();});
+    ui.mode.addEventListener(ev, draw);
+    ui.bg.addEventListener(ev, draw);
+    ui.grid.addEventListener(ev, draw);
+    ui.tool.addEventListener(ev, updateCursor);
+    ui.color.addEventListener(ev, draw);
+    ui.autoShadow.addEventListener(ev, ()=>flash(`Auto‑Shadow: ${ui.autoShadow.checked?'ON':'OFF'}`));
+    ui.shadowInk.addEventListener(ev, ()=>flash(`Shadow‑Ink: ${ui.shadowInk.checked?'ON':'OFF'}`));
+  });
+
+  ui.undo.onclick = ()=>{ if(S.shapes.length){ S.redo.push(S.shapes.pop()); draw(); } };
+  ui.redo.onclick = ()=>{ if(S.redo.length){ S.shapes.push(S.redo.pop()); draw(); } };
+  ui.clear.onclick = ()=>{ S.shapes.length=0; S.redo.length=0; draw(); };
+  ui.exportBtn.onclick = exportPNG;
+  ui.saveBtn.onclick = saveProject;
+  ui.loadBtn.onclick = loadProject;
+
+  document.addEventListener('keydown', e=>{
+    const k = e.key.toLowerCase();
+    if(k==='z' && e.shiftKey){ ui.redo.click(); }
+    else if(k==='z'){ ui.undo.click(); }
+    else if(k==='c'){ ui.clear.click(); }
+    else if(k==='s'){ e.preventDefault(); exportPNG(); }
+    else if(k==='a'){ ui.autoShadow.checked = !ui.autoShadow.checked; flash(`Auto‑Shadow: ${ui.autoShadow.checked?'ON':'OFF'}`); draw(); }
+    else if(k==='x'){ ui.shadowInk.checked = !ui.shadowInk.checked; flash(`Shadow‑Ink: ${ui.shadowInk.checked?'ON':'OFF'}`); draw(); }
+    else if(k==='b'){ ui.tool.value = 'bucket'; updateCursor(); flash('Tool: Bucket'); }
+  });
+
+  c.addEventListener('pointerdown', onDown);
+  c.addEventListener('pointermove', onMove);
+  c.addEventListener('pointerup', onUp);
+  c.addEventListener('pointercancel', onUp);
+
+  window.addEventListener('resize', resize); resize();
+  updateCursor();
+}
+
+function resize(){
+  const r = c.getBoundingClientRect();
+  S.w = Math.floor(r.width * DPR); S.h = Math.floor(r.height * DPR);
+  c.width = S.w; c.height = S.h; ctx.setTransform(DPR,0,0,DPR,0,0);
+  draw();
+}
+
+function updateCursor(){
+  const t = ui.tool.value;
+  if(t==='bucket') c.style.cursor = 'pointer';
+  else if(t==='brush') c.style.cursor = 'crosshair';
+  else c.style.cursor = 'cell';
+}
+
+function onDown(e){
+  const t = ui.tool.value;
+  if(t==='bucket'){
+    const p = pt(e);
+    bucketFill(Math.floor(p.x*DPR), Math.floor(p.y*DPR));
+    return; // no dragging for bucket
+  }
+  c.setPointerCapture(e.pointerId); S.drawing = true; S.redo.length = 0; const p = pt(e); S.start = p; S.current = [p];
+}
+function onMove(e){ if(!S.drawing) return; const p = pt(e); const t = ui.tool.value; if(t==='brush'){ const last = S.current[S.current.length-1]; if(!last || dist(p,last) > 1.2) S.current.push(p); } else { S.current = shapePreview(t, S.start, p); } draw(); }
+function onUp(e){ if(!S.drawing) return; S.drawing=false; const t = ui.tool.value; let pts; if(t==='brush') pts = S.current.slice(); else pts = shapePreview(t, S.start, pt(e)); if(pts && pts.length>1){ S.shapes.push({ type:t, pts: closePathIfNeeded(t, pts), color: ui.color.value, size: +ui.size.value, autoShadow: ui.autoShadow.checked, shadowInk: ui.shadowInk.checked }); } S.current=[]; S.start=null; draw(); }
+
+function pt(e){ const r=c.getBoundingClientRect(); return {x:(e.clientX-r.left), y:(e.clientY-r.top)} }
+function dist(a,b){ const dx=a.x-b.x, dy=a.y-b.y; return Math.hypot(dx,dy) }
+function closePathIfNeeded(type, pts){ if(type==='brush') return pts.slice(); const out = pts.slice(); if(out.length>2){ out.push({...out[0]}); } return out; }
+function shapePreview(type,a,b){ if(!a||!b) return []; switch(type){ case 'rect': return [a,{x:b.x,y:a.y},b,{x:a.x,y:b.y},a]; case 'circle':{ const cx = (a.x+b.x)/2, cy=(a.y+b.y)/2; const rx = Math.abs(b.x-a.x)/2, ry=Math.abs(b.y-a.y)/2; const n=32, pts=[]; for(let i=0;i<=n;i++){ const th=i/n*2*Math.PI; pts.push({x:cx+rx*Math.cos(th), y:cy+ry*Math.sin(th)}); } return pts; } case 'line': return [a,b]; default: return [a,b]; } }
+
+function draw(){
+  clearBG(); if(ui.grid.checked) drawGrid();
+  const angle = (+ui.angle.value) * Math.PI/180;
+  const L = +ui.length.value;
+  const alpha = +ui.alpha.value/100;
+  const blur = +ui.blur.value;
+  const mode = ui.mode.value; // cast|mirror|both|none
+
+  for(const s of S.shapes){
+    if(s.autoShadow && mode!=='none'){
+      if(mode==='cast' || mode==='both') drawCastShadow(s.pts, angle, L, alpha, blur);
+      if(mode==='mirror' || mode==='both') drawMirrorShadow(s.pts, L, alpha, blur);
+    }
+    if(s.shadowInk) drawShadowInkStroke(s.pts, alpha, blur, s.size);
+    else drawStroke(s.pts, s.color, s.size);
+  }
+
+  if(S.current.length){
+    if(ui.autoShadow.checked && mode!=='none'){
+      if(mode==='cast' || mode==='both') drawCastShadow(S.current, angle, L, alpha, blur);
+      if(mode==='mirror' || mode==='both') drawMirrorShadow(S.current, L, alpha, blur);
+    }
+    if(ui.shadowInk.checked) drawShadowInkStroke(S.current, alpha, blur, +ui.size.value, true);
+    else drawStroke(S.current, ui.color.value, +ui.size.value, true);
+  }
+}
+
+function clearBG(){ ctx.clearRect(0,0,c.width,c.height); if(ui.bg.value==='transparent') return; const g = ctx.createLinearGradient(0,0,0,c.height); if(ui.bg.value==='light'){ g.addColorStop(0,'#f6f8ff'); g.addColorStop(1,'#e7ecff'); } else { g.addColorStop(0,'#0f1422'); g.addColorStop(1,'#0b0f17'); } ctx.fillStyle = g; ctx.fillRect(0,0,c.width,c.height); }
+
+function drawGrid(){ ctx.save(); ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 0.5; const grid = 20; const W=c.width/DPR, H=c.height/DPR; for(let x=0;x<=W;x+=grid){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); } for(let y=0;y<=H;y+=grid){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); } ctx.restore(); }
+
+function drawStroke(pts, color, size, dashed=false){ ctx.save(); ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y); ctx.strokeStyle = color; ctx.lineWidth = size; ctx.lineJoin = 'round'; ctx.lineCap='round'; if(dashed) ctx.setLineDash([6,6]); ctx.stroke(); ctx.restore(); }
+
+function drawShadowInkStroke(pts, alpha, blur, size, dashed=false){ ctx.save(); ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x, pts[i].y); ctx.strokeStyle = `rgba(0,0,0,${alpha})`; ctx.lineWidth = size; ctx.lineJoin='round'; ctx.lineCap='round'; if(dashed) ctx.setLineDash([6,6]); ctx.filter = blur ? `blur(${blur}px)` : 'none'; ctx.stroke(); ctx.filter='none'; ctx.restore(); }
+
+function drawCastShadow(pts, angle, length, alpha, blur){ const dx = Math.cos(angle) * length; const dy = Math.sin(angle) * length; ctx.save(); ctx.beginPath(); ctx.moveTo(pts[0].x+dx, pts[0].y+dy); for(let i=1;i<pts.length;i++) ctx.lineTo(pts[i].x+dx, pts[i].y+dy); ctx.closePath(); ctx.fillStyle = `rgba(0,0,0,${alpha})`; ctx.filter = blur ? `blur(${blur}px)` : 'none'; ctx.fill(); ctx.filter = 'none'; ctx.restore(); }
+
+function drawMirrorShadow(pts, length, alpha, blur){ let base=-Infinity; for(const p of pts) base=Math.max(base,p.y); ctx.save(); ctx.beginPath(); const off = Math.max(4, length*0.15); ctx.moveTo(pts[0].x, base + (base-pts[0].y) + off); for(let i=1;i<pts.length;i++){ const p=pts[i]; ctx.lineTo(p.x, base + (base-p.y) + off); } ctx.closePath(); ctx.fillStyle = `rgba(0,0,0,${alpha})`; ctx.filter = blur ? `blur(${blur}px)` : 'none'; ctx.fill(); ctx.filter = 'none'; ctx.restore(); }
+
+// --- Bucket Fill (raster flood fill)
+function bucketFill(x, y){
+  const tol = +ui.bucketTol.value; // 0..64
+  const mode = ui.bucketMode.value; // all | alphaOnly
+  const W = c.width, H = c.height;
+  // Draw current vector state to ensure we fill on what we see
+  draw();
+  const img = ctx.getImageData(0,0,W,H);
+  const data = img.data;
+  const idx = (y*W + x) * 4;
+  const target = [data[idx], data[idx+1], data[idx+2], data[idx+3]];
+
+  // If alphaOnly and target is opaque enough, bail
+  if(mode==='alphaOnly' && target[3] > 10) { flash('Bucket: target not transparent'); return; }
+
+  const fill = ui.shadowInk.checked ? [0,0,0, Math.round((+ui.alpha.value/100)*255)]
+                                    : hexToRgba(ui.color.value, 255);
+
+  if(eqColor(target, fill, 0)) { flash('Bucket: same color'); return; }
+
+  const q = [];
+  q.push([x,y]);
+  let filled = 0;
+
+  while(q.length){
+    const [cx,cy] = q.pop();
+    if(cx<0||cy<0||cx>=W||cy>=H) continue;
+    const i = (cy*W + cx)*4;
+    const cur = [data[i],data[i+1],data[i+2],data[i+3]];
+    if(!eqColor(cur, target, tol)) continue;
+    // write pixel
+    data[i] = fill[0]; data[i+1] = fill[1]; data[i+2] = fill[2]; data[i+3] = fill[3];
+    filled++;
+    // push neighbors
+    q.push([cx+1,cy]); q.push([cx-1,cy]); q.push([cx,cy+1]); q.push([cx,cy-1]);
+  }
+  ctx.putImageData(img,0,0);
+  if(filled===0) flash('Bucket: no fill', true); else flash(`Bucket filled ${filled.toLocaleString()} px`);
+}
+
+function eqColor(a,b,t){
+  return Math.abs(a[0]-b[0])<=t && Math.abs(a[1]-b[1])<=t && Math.abs(a[2]-b[2])<=t && Math.abs(a[3]-b[3])<=t;
+}
+function hexToRgba(hex, a=255){
+  const h = hex.replace('#','');
+  const bigint = parseInt(h.length===3 ? h.split('').map(ch=>ch+ch).join('') : h, 16);
+  return [(bigint>>16)&255, (bigint>>8)&255, bigint&255, a];
+}
+
+function exportPNG(){ const link = document.createElement('a'); link.download = 'canvas-shadow.png'; link.href = c.toDataURL('image/png'); link.click(); }
+function saveProject(){ const payload = { shapes:S.shapes, settings:{ tool:ui.tool.value, size:+ui.size.value, color:ui.color.value, mode:ui.mode.value, angle:+ui.angle.value, length:+ui.length.value, alpha:+ui.alpha.value, blur:+ui.blur.value, bg:ui.bg.value, grid:ui.grid.checked, autoShadow: ui.autoShadow.checked, shadowInk: ui.shadowInk.checked, bucketTol:+ui.bucketTol.value, bucketMode: ui.bucketMode.value } }; localStorage.setItem('draw-shadow-project', JSON.stringify(payload)); flash('Saved'); }
+function loadProject(){ const raw = localStorage.getItem('draw-shadow-project'); if(!raw) return flash('Nothing saved', true); try{ const data = JSON.parse(raw); S.shapes = (data.shapes||[]).map(s=>({ type:s.type, pts:s.pts, color:s.color, size:s.size, autoShadow: !!s.autoShadow, shadowInk: !!s.shadowInk })); S.redo.length=0; const s = data.settings||{}; ui.tool.value=s.tool||'brush'; ui.size.value=s.size||5; ui.sizeVal.textContent=ui.size.value; ui.color.value=s.color||'#ffffff'; ui.mode.value=s.mode||'cast'; ui.angle.value=s.angle||45; ui.angleVal.textContent=ui.angle.value; ui.length.value=s.length||80; ui.lenVal.textContent=ui.length.value; ui.alpha.value=(s.alpha!=null?s.alpha:35); ui.alphaVal.textContent=(ui.alpha.value/100).toFixed(2); ui.blur.value=(s.blur!=null?s.blur:6); ui.blurVal.textContent=ui.blur.value; ui.bg.value=s.bg||'dark'; ui.grid.checked=!!s.grid; ui.autoShadow.checked = (s.autoShadow!=null?s.autoShadow:true); ui.shadowInk.checked = !!s.shadowInk; ui.bucketTol.value = (s.bucketTol!=null?s.bucketTol:12); ui.bucketTolVal.textContent = ui.bucketTol.value; ui.bucketMode.value = s.bucketMode||'all'; draw(); flash('Loaded'); }catch(e){ console.error(e); flash('Load failed', true); } }
+
+function flash(msg,isErr){ const d=document.createElement('div'); d.textContent=msg; d.style.position='fixed'; d.style.right='12px'; d.style.bottom='12px'; d.style.padding='8px 10px'; d.style.borderRadius='10px'; d.style.background=isErr? 'var(--error)': 'var(--good)'; d.style.color='#000'; document.body.appendChild(d); setTimeout(()=>d.remove(),1200); }
+
+// --- Kickoff
+init();
+</script>
+</body>
+</html>

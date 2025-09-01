@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CycleTrack — Big HUD (with Arrow Keys)</title>
+<style>
+  :root { --bg:#0b0e14; --panel:#111622; --accent:#5ee1a7; --warn:#ff6767; --text:#e6e6e6; --muted:#a7b0c0; --card:#141a28; --cardHover:#1b2233; --ring:#2b3350; }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,Noto Sans,Helvetica Neue,Arial; background:radial-gradient(1100px 760px at 70% -10%,#1b2340 0,var(--bg) 60%); color:var(--text); display:grid; place-items:start center; padding:24px}
+  .app{width:min(1120px,100%);display:grid;gap:16px;position:relative}
+  header{display:grid;gap:10px;background:linear-gradient(180deg,#12192a,var(--panel));padding:14px 16px;border-radius:16px;border:1px solid var(--ring);box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .topbar{display:flex;align-items:center;gap:16px;justify-content:space-between}
+  h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.2px}
+  .controls{display:flex;gap:8px;flex-wrap:wrap}
+  button{border:1px solid var(--ring);background:var(--card);color:var(--text);padding:8px 12px;border-radius:12px;cursor:pointer;font-weight:600;font-size:13px;transition:transform .08s ease,background .2s ease,border-color .2s ease}
+  button:hover{background:var(--cardHover)} button:active{transform:translateY(1px)}
+  .accent{border-color:#28483e;background:#0f1d1a}.accent:hover{background:#132722}
+  .danger{border-color:#4c2525;background:#1b1111}.danger:hover{background:#221414}
+  .hint{font-size:12px;color:var(--muted)}
+
+  /* LEFT-SIDE BIG ELIXIR HUD (as in your file) */
+  .elixirHud{
+    position:fixed;
+    left:clamp(250px, 6vw, 100px);
+    bottom:300px; /* lowered closer to deck row */
+    font-weight:1000;letter-spacing:-2px;font-variant-numeric:tabular-nums;line-height:.9;pointer-events:none;user-select:none;z-index:1;
+    font-size:clamp(80px, 14vw, 160px); /* smaller than before */
+    color:rgba(255,255,255,.58);
+    text-shadow:0 8px 18px rgba(0,0,0,.45), 0 0 1px rgba(0,0,0,.55);
+    filter: drop-shadow(0 2px 0 rgba(0,0,0,.25));
+  }
+  @media (max-width: 900px){ .elixirHud{ left:clamp(20px, 6vw, 60px); font-size:clamp(96px, 28vw, 160px);} }
+
+  /* Board */
+  .board{display:grid;grid-template-rows:auto auto auto;gap:14px}
+  .queue{display:grid;grid-auto-rows:160px;align-content:end;justify-content:center}
+  .deck{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+
+  /* Tiles */
+  .tile{position:relative;background:var(--card);border:1px solid var(--ring);border-radius:16px;padding:10px;display:grid;grid-template-columns:120px 1fr;gap:12px;align-items:center;min-height:140px;cursor:pointer;overflow:hidden}
+  .tile:hover{background:var(--cardHover)}
+  .tile.ready[data-hotkey]{outline:2px solid transparent; transition:outline-color .12s ease}
+  .tile.ready[data-hotkey]:after{content:attr(data-hotkey);position:absolute;top:8px;left:10px;font-size:12px;color:var(--muted);opacity:.6}
+  .tile.ready.isHot{outline-color:#6dd4ff88}
+  .imgWrap{position:relative;width:120px;height:120px;border-radius:14px;overflow:hidden}
+  .tileImg, .fallback{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border:1px solid var(--ring);border-radius:14px;background:#0e1426;display:grid;place-items:center;font-weight:900;font-size:26px;color:#8ea0c8}
+  .label{font-weight:800;font-size:16px}
+  .meta{font-size:12px;color:var(--muted)}
+
+  /* Elixir bar */
+  .elixir { display: grid; gap: 6px; margin: 6px 0 0; }
+  .elixirRow { display: flex; align-items: center; gap: 10px; }
+  .elixirLabel { font-size: 12px; color: var(--muted); }
+  .elixirNum { font-weight: 900; font-size: 22px; min-width: 2ch; text-align: right; }
+  .bar { position: relative; flex: 1; height: 16px; border: 1px solid rgba(0, 0, 0, 0.9); border-radius: 999px; background: hwb(290 4% 86%); overflow: hidden; }
+  .fill { height: 100%; width: 0%; background: linear-gradient(90deg, #7a3cff 0%, #d131d2 50%, #a020a8 100%); transition: width .12s linear; }
+  .bar .segmentGrid { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(10, 1fr); }
+  .bar .segmentGrid span { border-right: 2px solid rgba(0, 0, 0, 0.9); }
+  .bar .segmentGrid span:last-child { border-right: none; }
+
+  /* Palette */
+  .palette{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);width:min(780px,92vw);background:var(--panel);border:1px solid var(--ring);border-radius:16px;box-shadow:0 24px 64px rgba(0,0,0,.45);display:none;z-index:50}
+  .palette.open{display:block}
+  .pal-head{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--ring)}
+  .pal-body{padding:10px 12px;display:grid;gap:8px}
+  .pal-search{display:flex;gap:8px}
+  .pal-search input{flex:1;border:1px solid var(--ring);background:var(--card);color:var(--text);padding:10px 12px;border-radius:12px;font-size:14px}
+  .pal-list{max-height:260px;overflow:auto;border:1px solid var(--ring);border-radius:12px}
+  .pal-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-bottom:1px solid #1f2740;cursor:pointer}
+  .pal-item:last-child{border-bottom:none}
+  .pal-item[aria-selected="true"], .pal-item:hover{background:var(--cardHover)}
+  .thumb{width:36px;height:36px;border-radius:8px;border:1px solid var(--ring);background:#0e1426;object-fit:cover;display:block}
+  .score{margin-left:auto;font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="elixirHud" id="elixirBig">0</div>
+
+    <header>
+      <div class="topbar">
+        <div>
+          <h1>CycleTrack</h1>
+          <div class="hint">Click <strong>Start</strong> to begin elixir (sets to 5). If there are <code>?</code> slots, typing any letter opens the palette. Undo=9, Redo=0. Hotkeys: <strong>1–4</strong> play the 4 ready tiles. New: <strong>←/→</strong> adjust elixir.</div>
+        </div>
+        <div class="controls">
+          <button id="btnStart" class="accent" title="Start elixir">Start</button>
+          <button id="btnReset" class="danger" title="Reset everything">Reset</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="board">
+      <div class="queue" id="queue"></div>
+      <div class="deck" id="deck"></div>
+      <div class="elixir">
+        <div class="elixirRow">
+          <div class="elixirLabel">Elixir</div>
+          <div class="bar"><div class="fill" id="elixirFill"></div><div class="segmentGrid"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div></div>
+          <div class="elixirNum" id="elixirNum">0</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hint" style="text-align:center">Click a deck tile to mark as played. Queue shows cards not yet ready, ordered furthest (top) to closest.</div>
+  </div>
+
+  <div class="palette" id="palette" role="dialog" aria-modal="true" aria-label="Quick Assign">
+    <div class="pal-head">
+      <div>Quick Assign</div>
+      <div>Target slot: <span id="palSlot">1</span></div>
+      <div><span class="kbd">Enter</span> assign • <span class="kbd">Esc</span> close</div>
+    </div>
+    <div class="pal-body">
+      <div class="pal-search"><input id="palInput" type="text" placeholder="Type a card… (e.g., Princess, Mega Knight, Log)" autocomplete="off" /></div>
+      <div class="pal-list" id="palList" role="listbox" aria-label="Card results"></div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  const ICON_BASE = 'https://harvey362.github.io/clash-royale-icons/';
+
+  const CARDS = ['Archers','Archer Queen','Baby Dragon','Balloon','Bandit','Barbarians','Bats','Battle Healer','Battle Ram','Berserker','Bomber','Boss Bandit','Bowler','Cannon Cart','Dark Prince','Dart Goblin','Electro Dragon','Electro Giant','Electro Spirit','Electro Wizard','Elite Barbarians','Elixir Golem','Executioner','Fire Spirit','Firecracker','Fisherman','Flying Machine','Giant','Giant Skeleton','Goblin Demolisher','Goblin Gang','Goblin Giant','Goblin Machine','Goblins','Goblinstein','Golden Knight','Golem','Guards','Heal Spirit','Hog Rider','Hunter','Ice Golem','Ice Spirit','Ice Wizard','Knight','Lava Hound','Little Prince','Lumberjack','Magic Archer','Mega Knight','Mega Minion','Mighty Miner','Miner','Mini P.E.K.K.A.','Minion Horde','Minions','Monk','Mother Witch','Musketeer','Night Witch','P.E.K.K.A.','Phoenix','Prince','Princess','Ram Rider','Rascals','Royal Ghost','Royal Giant','Royal Hogs','Royal Recruits','Rune Giant','Skeleton Army','Skeleton Barrel','Skeleton Dragons','Skeleton King','Skeletons','Sparky','Spear Goblins','Spirit Empress','Suspicious Bush','Three Musketeers','Valkyrie','Wall Breakers','Witch','Wizard','Zappies','Barbarian Hut','Bomb Tower','Cannon','Elixir Collector','Furnace','Goblin Cage','Goblin Drill','Goblin Hut','Inferno Tower','Mortar','Tesla','Tombstone','X-Bow','Arrows','Barbarian Barrel','Clone','Earthquake','Fireball','Freeze','Giant Snowball','Goblin Barrel','Goblin Curse','Graveyard','Lightning','Mirror','Poison','Rage','Rocket','Royal Delivery','Log','Tornado','Void','Zap'];
+
+  const COSTS = { 'Skeletons':1,'Ice Spirit':1,'Fire Spirit':1,'Electro Spirit':1,'Heal Spirit':1,
+    'Goblins':2,'Bomber':2,'Spear Goblins':2,'Ice Golem':2,'Bats':2,'Wall Breakers':2,'Suspicious Bush':2,'Berserker':2,'Rage':2,'Zap':2,'Log':2,'Barbarian Barrel':2,'Giant Snowball':2,'Goblin Curse':2,
+    'Knight':3,'Archers':3,'Minions':3,'Skeleton Army':3,'Ice Wizard':3,'Guards':3,'Princess':3,'Miner':3,'Mega Minion':3,'Dart Goblin':3,'Goblin Gang':3,'Bandit':3,'Royal Ghost':3,'Skeleton Barrel':3,'Fisherman':3,'Firecracker':3,'Elixir Golem':3,'Little Prince':3,'Goblin Machine':3,'Cannon':3,'Tombstone':3,'Arrows':3,'Goblin Barrel':3,'Tornado':3,'Clone':3,'Earthquake':3,'Royal Delivery':3,'Void':3,
+    'Valkyrie':4,'Musketeer':4,'Baby Dragon':4,'Mini P.E.K.K.A.':4,'Hog Rider':4,'Dark Prince':4,'Lumberjack':4,'Battle Ram':4,'Inferno Dragon':4,'Electro Wizard':4,'Hunter':4,'Night Witch':4,'Zappies':4,'Flying Machine':4,'Magic Archer':4,'Mighty Miner':4,'Battle Healer':4,'Skeleton King':4,'Golden Knight':4,'Skeleton Dragons':4,'Mother Witch':4,'Phoenix':4,'Goblin Demolisher':4,'Rune Giant':4,'Mortar':4,'Bomb Tower':4,'Tesla':4,'Furnace':4,'Goblin Cage':4,'Goblin Drill':4,'Fireball':4,'Freeze':4,'Poison':4,
+    'Giant':5,'Balloon':5,'Witch':5,'Barbarians':5,'Prince':5,'Wizard':5,'Minion Horde':5,'Bowler':5,'Executioner':5,'Ram Rider':5,'Rascals':5,'Cannon Cart':5,'Royal Hogs':5,'Electro Dragon':5,'Archer Queen':5,'Monk':5,'Goblinstein':5,'Goblin Hut':5,'Inferno Tower':5,'Graveyard':5,
+    'Giant Skeleton':6,'Royal Giant':6,'Sparky':6,'Elite Barbarians':6,'Goblin Giant':6,'Boss Bandit':6,'Spirit Empress':6,'Elixir Collector':6,'X-Bow':6,'Rocket':6,'Lightning':6,
+    'P.E.K.K.A.':7,'Lava Hound':7,'Royal Recruits':7,'Mega Knight':7,'Electro Giant':7,'Barbarian Hut':7,
+    'Golem':8,'Three Musketeers':9,'Mirror':'variable' };
+
+  // keep a single shared lastPlayedCost reference
+  let lastPlayedCost = null;
+  function costFor(name){
+    if(!name) return 2;
+    if(name==='Mirror'){
+      const prev=(typeof lastPlayedCost==='number'? lastPlayedCost:2);
+      return Math.min(9,prev+1);
+    }
+    const v=COSTS[name];
+    return typeof v==='number'? v:2;
+  }
+
+  const STORAGE_KEY='cycletrack:fixed-icons:notches:v6b-bughud';
+  let state={ slots:Array.from({length:8},()=>({name:'?',c:0})), history:[], future:[], iconBase:ICON_BASE, running:false,startMs:0,nextMs:null,elixir:0 };
+
+  const queueEl=document.getElementById('queue');
+  const deckEl=document.getElementById('deck');
+  const btnStart=document.getElementById('btnStart');
+  const btnReset=document.getElementById('btnReset');
+  const elixirNum=document.getElementById('elixirNum');
+  const elixirBig=document.getElementById('elixirBig');
+  const elixirFill=document.getElementById('elixirFill');
+  const pal=document.getElementById('palette');
+  const palInput=document.getElementById('palInput');
+  const palList=document.getElementById('palList');
+  const palSlotEl=document.getElementById('palSlot');
+
+  const clone=o=>JSON.parse(JSON.stringify(o));
+  function save(){ try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){} }
+  function load(){ try{ const raw=localStorage.getItem(STORAGE_KEY); if(raw){ const s=JSON.parse(raw); if(s && s.slots && s.slots.length===8){ state=Object.assign({history:[],future:[]}, s, {history:[],future:[]}); } } }catch(e){} }
+
+  function pushHistory(){ state.history.push(clone({slots:state.slots})); if(state.history.length>300) state.history.shift(); state.future.length=0; }
+  function undo(){ const prev=state.history.pop(); if(!prev) return; state.future.push(clone({slots:state.slots})); state.slots=prev.slots; render(); save(); }
+  function redo(){ const nxt=state.future.pop(); if(!nxt) return; state.history.push(clone({slots:state.slots})); state.slots=nxt.slots; render(); save(); }
+  function resetAll(){ state.slots=Array.from({length:8},()=>({name:'?',c:0})); state.history=[]; state.future=[]; closePalette(); render(); save(); }
+
+  function canOpenPalette(){ return state.slots.some(s=>s.name==='?'); }
+
+  function normalize(str){ let out=''; const s=str.toLowerCase(); for(let i=0;i<s.length;i++){ const ch=s[i]; if((ch>='a'&&ch<='z')||(ch>='0'&&ch<='9')||ch===' ') out+=ch; } return out.trim(); }
+  function initials(name){ const parts=name.split(' ').filter(Boolean); let t=parts.slice(0,2).map(p=>p[0].toUpperCase()).join(''); return t||'?'; }
+  function slugify(name){ let s=name.toLowerCase(); let out=''; for(let i=0;i<s.length;i++){ const ch=s[i]; if(ch===' '||ch==='_'){ if(out[out.length-1]!=='-') out+='-'; } else if((ch>='a'&&ch<='z')||(ch>='0'&&ch<='9')||ch==='-'){ out+=ch; } }
+    while(out.indexOf('--')!==-1) out=out.replace('--','-'); if(out.startsWith('-')) out=out.slice(1); if(out.endsWith('-')) out=out.slice(0,-1); return out; }
+  function scoreCandidate(q,name){ const nq=normalize(q); const nn=normalize(name); if(!nq) return 0; if(nn.startsWith(nq)) return 200-(nn.length-nq.length); let qi=0,score=0; for(let i=0;i<nn.length && qi<nq.length;i++){ if(nn[i]===nq[qi]){ qi++; score+=2; if(i===0||nn[i-1]===' ') score+=3; } } return qi===nq.length? score : -1; }
+
+  // palette
+  let paletteTarget=0;
+  function openPalette(targetIndex){ if(!canOpenPalette()) return; paletteTarget = (typeof targetIndex==='number')? targetIndex : state.slots.findIndex(s=>s.name==='?'); if(paletteTarget<0) paletteTarget=0; pal.classList.add('open'); palSlotEl.textContent=(paletteTarget+1); palInput.value=''; renderPalette(''); setTimeout(()=>palInput.focus(),0); }
+  function closePalette(){ pal.classList.remove('open'); }
+  function renderPalette(q){ const vals = (q?CARDS.filter(n=>scoreCandidate(q,n)>=0):CARDS.slice()).map(n=>({name:n,score:scoreCandidate(q||'',n)})); vals.sort((a,b)=> b.score-a.score || a.name.localeCompare(b.name)); const top=vals.slice(0,12);
+    palList.innerHTML=''; if(!top.length){ const d=document.createElement('div'); d.className='pal-item'; d.textContent='No matches'; palList.appendChild(d); return; }
+    top.forEach((m,idx)=>{ const d=document.createElement('div'); d.className='pal-item'; d.setAttribute('role','option'); d.setAttribute('aria-selected', idx===0?'true':'false'); d.dataset.name=m.name; const url=getIconUrl(m.name); const thumb=url? `<img class="thumb" src="${url}" alt="">` : `<span class="thumb" style="display:grid;place-items:center;">${m.name[0]}</span>`; d.innerHTML=`${thumb}<div>${m.name}</div><div class="score">${m.score}</div>`; palList.appendChild(d); });
+    highlightIndex=0;
+  }
+  palList.addEventListener('click', (e)=>{ const it=e.target.closest('.pal-item'); if(it && it.dataset.name){ assignAndPlay(paletteTarget,it.dataset.name); closePalette(); } });
+  palInput.addEventListener('input', ()=> renderPalette(palInput.value));
+  let highlightIndex=0; function moveHighlight(d){ const items=[...palList.querySelectorAll('.pal-item')]; if(!items.length) return; items[highlightIndex]?.setAttribute('aria-selected','false'); highlightIndex=(highlightIndex+d+items.length)%items.length; items[highlightIndex]?.setAttribute('aria-selected','true'); items[highlightIndex]?.scrollIntoView({block:'nearest'}); }
+  function selectHighlight(){ const sel=palList.querySelector('.pal-item[aria-selected="true"]'); if(sel && sel.dataset.name){ assignAndPlay(paletteTarget, sel.dataset.name); closePalette(); } }
+
+  // icons + tiles
+  function getIconUrl(name){ if(!name || name==='?') return null; return state.iconBase + slugify(name) + '.png'; }
+  function splitDeck(){ const ready=[],wait=[]; for(let i=0;i<8;i++){ const s=state.slots[i]; (s.c===0?ready:wait).push(i);} wait.sort((a,b)=> state.slots[b].c - state.slots[a].c || a-b); return {ready,wait}; }
+  function tileHtml(i,kind,hotKey){ const s=state.slots[i]; const name=s.name; const url=getIconUrl(name); const img = url? `<img class="tileImg" src="${url}" alt="">` : `<div class="fallback">${name&&name!=='?'? initials(name):'?'}</div>`; return `<div class="tile ${kind}" data-i="${i}" ${hotKey?`data-hotkey="${hotKey}"`:''}><div class="imgWrap">${img}</div><div class="label">${name}</div>${kind==='waiting'?`<div class="meta">${s.c} until back</div>`:''}</div>`; }
+  function render(){ const {ready,wait}=splitDeck(); deckEl.innerHTML=ready.slice(0,4).map((i,idx)=>tileHtml(i,'ready', idx<4? (idx+1):'')).join(''); queueEl.innerHTML=wait.map(i=>tileHtml(i,'waiting')).join('');
+    deckEl.querySelectorAll('.tile.ready').forEach(el=> el.addEventListener('click',()=>play(Number(el.dataset.i))));
+    queueEl.querySelectorAll('.tile.waiting').forEach(el=> el.addEventListener('click',()=>{ const i=Number(el.dataset.i); if(state.slots[i].name==='?') openPalette(i); }));
+  }
+
+  // plays
+  function assignAndPlay(i,card){ pushHistory(); state.slots[i].name=card; for(let k=0;k<8;k++){ if(state.slots[k].c>0) state.slots[k].c--; } state.slots[i].c=4; const cost=costFor(card); spend(cost); lastPlayedCost=cost; render(); save(); }
+  function play(i){ const s=state.slots[i]; if(s.name==='?'){ openPalette(i); return; } if(s.c>0){ return; } pushHistory(); for(let k=0;k<8;k++){ if(state.slots[k].c>0) state.slots[k].c--; } s.c=4; const cost=costFor(s.name); spend(cost); lastPlayedCost=cost; render(); save(); }
+
+  // elixir
+  function startElixir(){ if(state.running) return; state.running=true; state.startMs=performance.now(); state.elixir=5; state.nextMs=state.startMs+2800; updateElixirUI(0); }
+  function modeInterval(now){ return now-state.startMs>=120000?1400:2800; }
+  function spend(cost){ if(!Number.isFinite(cost)) cost=2; state.elixir=Math.max(0,Math.min(10,state.elixir-cost)); if(state.running && state.elixir<10 && state.nextMs==null){ const now=performance.now(); state.nextMs=now+modeInterval(now); } updateElixirUI(0); }
+  function tick(){ const now=performance.now(); if(state.running){ const interval=modeInterval(now); if(state.elixir<10 && state.nextMs){ const frac=1-Math.max(0,Math.min(1,(state.nextMs-now)/interval)); updateElixirUI(frac); } else { updateElixirUI(0); } if(state.elixir<10 && state.nextMs && now>=state.nextMs){ state.elixir=Math.min(10,state.elixir+1); if(state.elixir>=10){ state.nextMs=null; updateElixirUI(0); } else { state.nextMs=now+modeInterval(now); updateElixirUI(0); } } } requestAnimationFrame(tick); }
+  function updateElixirUI(frac){ const val=Math.max(0,Math.min(10,Math.round(state.elixir))); elixirNum.textContent=val; if(elixirBig) elixirBig.textContent=val; let visual=state.elixir; if(state.elixir<10) visual += Math.max(0,Math.min(1,frac)); const pct=Math.max(0,Math.min(100,visual*10)); elixirFill.style.width=pct+'%'; }
+
+  // keyboard (kept your existing behavior; added ←/→ elixir adjust)
+  document.addEventListener('keydown',(e)=>{
+    // if palette open, only handle palette navigation keys
+    if(pal.classList.contains('open')){
+      if(e.key==='Escape'){ e.preventDefault(); closePalette(); return; }
+      if(e.key==='ArrowDown'){ e.preventDefault(); moveHighlight(1); return; }
+      if(e.key==='ArrowUp'){ e.preventDefault(); moveHighlight(-1); return; }
+      if(e.key==='Enter'){ e.preventDefault(); selectHighlight(); return; }
+      return;
+    }
+
+    // NEW: Arrow key elixir controls
+    if(e.key==='ArrowLeft'){
+      e.preventDefault();
+      state.elixir = Math.max(0, state.elixir - 1);
+      // keep timing sane
+      if(state.elixir>=10){ state.nextMs = null; }
+      else if(state.running && state.nextMs==null){ const now=performance.now(); state.nextMs = now + modeInterval(now); }
+      updateElixirUI(0);
+      return;
+    }
+    if(e.key==='ArrowRight'){
+      e.preventDefault();
+      state.elixir = Math.min(10, state.elixir + 1);
+      if(state.elixir>=10){ state.nextMs = null; }
+      else if(state.running && state.nextMs==null){ const now=performance.now(); state.nextMs = now + modeInterval(now); }
+      updateElixirUI(0);
+      return;
+    }
+
+    if(/^[a-zA-Z]$/.test(e.key) && canOpenPalette()){ openPalette(); palInput.value=e.key; renderPalette(e.key); return; }
+    if(((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='k') || e.key==='/'){ e.preventDefault(); if(canOpenPalette()) openPalette(); return; }
+
+    if(e.key==='9'){ e.preventDefault(); undo(); return; }
+    if(e.key==='0'){ e.preventDefault(); redo(); return; }
+
+    if(['1','2','3','4'].includes(e.key)){
+      const {ready}=splitDeck();
+      const idx=Number(e.key)-1;
+      const tile=deckEl.querySelector(`.tile.ready[data-hotkey="${e.key}"]`);
+      if(tile){ tile.classList.add('isHot'); setTimeout(()=>tile.classList.remove('isHot'),150); }
+      if(ready[idx]!==undefined){ play(ready[idx]); }
+    }
+  });
+
+  btnStart.addEventListener('click', startElixir);
+  btnReset.addEventListener('click', ()=>{ if(confirm('Reset all names + counters?')){ state.running=false; state.elixir=0; state.startMs=0; state.nextMs=null; resetAll(); updateElixirUI(0); } });
+
+  function renderAll(){ render(); updateElixirUI(0); }
+  load(); renderAll(); requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

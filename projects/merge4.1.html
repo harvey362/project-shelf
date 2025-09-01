@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Merge Tactics Trainer — Bench + Shop (v1, Spirit Empress)</title>
+<style>
+  :root{
+    --bg:#0B1026;
+    --panel:#121837;
+    --card:#12183a;
+    --border:#28325a;
+    --muted:#8e9ac4;
+    --pill:#1a2252;
+    --pillText:#e8ecff;
+  }
+  html,body{margin:0;background:var(--bg);color:#dfe5ff;font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif}
+  *{box-sizing:border-box}
+
+  header{padding:14px 18px;border-bottom:1px solid #0e1330;background:linear-gradient(#0c1230,#0a1027)}
+  header h1{font-size:18px;margin:0}
+  header .hint{opacity:.7;font-size:12px}
+  .wrap{max-width:1100px;margin:16px auto;padding:0 16px}
+
+  .top{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .spacer{flex:1}
+
+  .pill{
+    background:var(--pill);
+    color:var(--pillText);
+    border:1px solid #273364;
+    padding:8px 12px;
+    border-radius:14px;
+    font-size:14px;
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+  }
+  .btn{
+    background:#1a2252;border:1px solid #2b3a78;color:#dfe5ff;
+    padding:8px 12px;border-radius:10px;cursor:pointer
+  }
+  .btn:hover{filter:brightness(1.05)}
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:18px;
+    padding:14px;
+    margin:14px 0;
+    overflow:visible; /* let overhangs show */
+  }
+  .row{display:flex;align-items:center;gap:8px}
+
+  /* Timer bar */
+  .timerBar{height:6px;background:#0f1433;border-radius:6px;overflow:hidden;border:1px solid #28325a}
+  .timerFill{height:100%;width:0;background:linear-gradient(90deg,#39e6a7,#61b8ff)}
+
+  /* Layouts */
+  .bench{display:grid;grid-template-columns:repeat(5,1fr);gap:16px}
+  .shop{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  .slot{
+    background:#0d1232;border:1px dashed #2c3561;border-radius:18px;
+    padding:8px;min-height:160px;display:flex;align-items:center;justify-content:center;
+    position:relative;overflow:visible;
+  }
+
+  /* Cards */
+  .card{
+    position:relative;width:134px;aspect-ratio:267/339;border-radius:10px;overflow:visible;
+    border:1px solid var(--border);background:var(--card);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .card img{
+    position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:10px
+  }
+
+  /* Bench “Sell” chip */
+  .sell{
+    position:absolute;top:8px;right:8px;background:#0009;color:#fff;border-radius:10px;padding:4px 10px;
+    font-weight:600;border:1px solid #445;backdrop-filter:blur(2px);cursor:pointer
+  }
+
+  /* Shop-only: elixir droplet badge (orange-gold, overhang top-left) */
+  .badge.drop{
+    position:absolute;top:-12px;left:-12px;width:38px;height:42px;
+    border-radius:50% 50% 45% 45% / 55% 55% 45% 45%;
+    background:
+      radial-gradient(35% 35% at 30% 30%, rgba(255,255,255,.4), rgba(255,255,255,0) 60%),
+      linear-gradient(#ffdb66,#e08a1a);
+    border:2px solid #7a4100;color:#fff;text-shadow:0 2px 2px rgba(0,0,0,.6);
+    display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;
+    box-shadow:0 2px 5px rgba(0,0,0,.45);z-index:2;
+  }
+  .badge.drop::after{
+    content:"";position:absolute;left:50%;transform:translateX(-50%);
+    bottom:-10px;width:0;height:0;border-left:9px solid transparent;border-right:9px solid transparent;
+    border-top:12px solid #e08a1a;filter:drop-shadow(0 1px 1px rgba(0,0,0,.35));
+  }
+
+  /* Merge flash (on upgraded bench card) */
+  .card.mergeFlash{animation:mt-merge-flash .16s ease-out;will-change:transform,box-shadow,filter}
+  @keyframes mt-merge-flash{
+    0%{transform:scale(1);box-shadow:0 0 0 rgba(255,220,120,0);filter:brightness(1)}
+    35%{transform:scale(1.05);box-shadow:0 0 18px rgba(255,220,120,.65);filter:brightness(1.15)}
+    100%{transform:scale(1);box-shadow:0 0 0 rgba(255,220,120,0);filter:brightness(1)}
+    
+  }
+/* Shop refresh: fast fade-out then fade-in */
+.shop.fade-out .card{
+  animation: mt-shop-out .12s ease-out forwards;
+}
+@keyframes mt-shop-out{
+  to { opacity: 0; transform: translateY(3px); filter: blur(1px); }
+}
+
+.shop.fade-in .card{
+  animation: mt-shop-in .14s ease-out forwards;
+}
+@keyframes mt-shop-in{
+  from { opacity: 0; transform: translateY(-3px); filter: blur(1px); }
+  to   { opacity: 1; transform: none;             filter: none; }
+}
+
+  /* Bench-only stars (overhang top-left) */
+  .stars{position:absolute;top:-14px;left:-14px;display:flex;gap:4px;z-index:5}
+  /* layered star: white outline under a smaller colored fill */
+  .starWrap{position:relative;width:28px;height:28px}
+  .starWrap::before{
+    content:"";position:absolute;inset:0;
+    clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+    background:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.65);filter:drop-shadow(0 1px 2px rgba(0,0,0,.6));
+  }
+  .starCore{
+    position:absolute;inset:3px;
+    clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+  }
+  .starCore.star-1{background:linear-gradient(#ff8c5c,#cc4e24)}   /* bronze */
+  .starCore.star-2{background:linear-gradient(#f4f6f8,#b9c1c8)}   /* silver */
+  .starCore.star-3{background:linear-gradient(#ffd76a,#e09a24)}   /* gold */
+
+  /* Shop's tiny text star (removed now) — left here unused intentionally */
+  .card .star{display:none}
+</style>
+</head>
+<body>
+  <header>
+    <h1>Merge Tactics Trainer — Bench + Shop (v1, Spirit Empress)</h1>
+    <div class="spacer"></div>
+    <div class="hint">Keys: <b>1/2/3</b> buy • <b>Space</b> start</div>
+  </header>
+
+  <div class="wrap">
+    <div class="top">
+      <div class="pill">Elixir: <b id="elixir">4</b></div>
+      <div class="pill">Merges: <b id="merges">0</b></div>
+      <div class="pill">Buys/Sells: <b id="bs">0/0</b></div>
+      <div class="pill">Net Elixir: <b id="net">0</b></div>
+      <div class="spacer"></div>
+      <button class="btn" id="startBtn">Start 30s</button>
+      <button class="btn" id="resetBtn">Reset</button>
+
+      <!-- Merge bias slider -->
+      <label class="pill" style="display:flex;gap:10px;align-items:center">
+        Merge Bias
+        <input type="range" id="biasSlider" min="0" max="100" value="60" step="5"
+               style="accent-color:#ffb400; cursor:pointer;">
+        <span id="biasLabel" style="min-width:110px;">60% (Lucky)</span>
+      </label>
+    </div>
+
+    <div class="row" style="margin:8px 0 12px">
+      <div class="timerBar" style="flex:1"><div id="timerFill" class="timerFill"></div></div>
+    </div>
+
+    <div class="panel">
+      <div id="bench" class="bench"></div>
+    </div>
+
+    <div class="panel">
+      <div id="shop" class="shop"></div>
+    </div>
+  </div>
+
+<script>
+/* =================== Data / Config =================== */
+const IMG_BASE = "https://harvey362.github.io/merge-tactics-icons";
+const COPIES_PER_TROOP = 4;
+const START_ELIXIR = 4;
+const ROUND_SECS = 30;
+
+const TROOPS = {
+  // 2 elixir
+  "archers":        { cost: 2, img: `${IMG_BASE}/archers.jpg` },
+  "barbarians":     { cost: 2, img: `${IMG_BASE}/barbarians.jpg` },
+  "bomber":         { cost: 2, img: `${IMG_BASE}/bomber.jpg` },
+  "goblins":        { cost: 2, img: `${IMG_BASE}/goblins.jpg` },
+  "knight":         { cost: 2, img: `${IMG_BASE}/knight.jpg` },
+  "spear-goblins":  { cost: 2, img: `${IMG_BASE}/spear-goblins.jpg` },
+
+  // 3 elixir
+  "dart-goblin":    { cost: 3, img: `${IMG_BASE}/dart-goblin.jpg` },
+  "executioner":    { cost: 3, img: `${IMG_BASE}/executioner.jpg` },
+  "giant-skeleton": { cost: 3, img: `${IMG_BASE}/giant-skeleton.jpg` },
+  "pekka":          { cost: 3, img: `${IMG_BASE}/pekka.jpg` },
+  "prince":         { cost: 3, img: `${IMG_BASE}/prince.jpg` },
+  "valkyrie":       { cost: 3, img: `${IMG_BASE}/valkyrie.jpg` },
+
+  // 4 elixir
+  "bandit":         { cost: 4, img: `${IMG_BASE}/bandit.jpg` },
+  "goblin-machine": { cost: 4, img: `${IMG_BASE}/goblin-machine.jpg` },
+  "mega-knight":    { cost: 4, img: `${IMG_BASE}/mega-knight.jpg` },
+  "princess":       { cost: 4, img: `${IMG_BASE}/princess.jpg` },
+  "royal-ghost":    { cost: 4, img: `${IMG_BASE}/royal-ghost.jpg` },
+
+  // 5 elixir
+  "archer-queen":   { cost: 5, img: `${IMG_BASE}/archer-queen.jpg` },
+  "golden-knight":  { cost: 5, img: `${IMG_BASE}/golden-knight.jpg` },
+  "skeleton-king":  { cost: 5, img: `${IMG_BASE}/skeleton-king.jpg` },
+};
+
+const TWO_COST_IDS = Object.keys(TROOPS).filter(id => TROOPS[id].cost === 2);
+
+/* =================== State =================== */
+const state = {
+  pool: {},          // id -> copies remaining
+  bench: new Array(5).fill(null),  // {id, star, totalCost}
+  shop: [],
+  elixir: START_ELIXIR,
+  merges: 0,
+  buys: 0,
+  sells: 0,
+  running: false,
+  startTs: 0
+};
+
+/* =================== Helpers / DOM refs =================== */
+const $ = sel => document.querySelector(sel);
+const benchEl = $('#bench');
+const shopEl = $('#shop');
+const elixirEl = $('#elixir');
+const mergesEl = $('#merges');
+const bsEl = $('#bs');
+const netEl = $('#net');
+const timerFill = $('#timerFill');
+
+/* === Merge-bias slider (0–100%) === */
+const biasSlider = document.getElementById('biasSlider');
+const biasLabel  = document.getElementById('biasLabel');
+let MERGE_PROB = 0.6; // default 60%
+
+if (biasSlider && biasLabel) {
+  MERGE_PROB = (parseInt(biasSlider.value, 10) || 0) / 100;
+
+  const updateBiasLabel = () => {
+    let nick = "";
+    if (MERGE_PROB === 0) nick = "Realistic";
+    else if (MERGE_PROB === 0.5) nick = "Lucky";
+    else if (MERGE_PROB === 1) nick = "Cheater";
+    biasLabel.textContent = `${Math.round(MERGE_PROB*100)}%` + (nick ? ` (${nick})` : "");
+  };
+
+  updateBiasLabel();
+
+  biasSlider.addEventListener('input', () => {
+    MERGE_PROB = (parseInt(biasSlider.value, 10) || 0) / 100;
+    updateBiasLabel();
+  });
+}
+
+/* =================== Core Logic =================== */
+function resetPool(){
+  state.pool = {};
+  for (const id of Object.keys(TROOPS)) state.pool[id] = COPIES_PER_TROOP;
+}
+function poolCount(id){ return state.pool[id] || 0; }
+function takeFromPool(id, q=1){
+  if (poolCount(id) < q) return false;
+  state.pool[id] -= q; return true;
+}
+function addToPool(id, q=1){
+  state.pool[id] = Math.min(COPIES_PER_TROOP, poolCount(id) + q);
+}
+
+function firstEmptyBench(){
+  for (let i=0;i<state.bench.length;i++) if (!state.bench[i]) return i;
+  return -1;
+}
+
+/* Draw up to n unique troops; weighted by remaining copies.
+   With probability MERGE_PROB, ensure one slot is a pairable ID if possible. */
+function drawFromPool(n){
+  let entries = Object.entries(state.pool).filter(([,c]) => c > 0);
+  if (!entries.length) return [];
+
+  const have1 = new Set(state.bench.filter(u => u && u.star === 1).map(u => u.id));
+  const picks = [];
+
+  if (MERGE_PROB > 0){
+    const canPair = entries.map(([id]) => id).filter(id => have1.has(id));
+    if (canPair.length && Math.random() < MERGE_PROB){
+      const chosenId = canPair[Math.floor(Math.random() * canPair.length)];
+      picks.push(chosenId);
+      entries = entries.filter(([id]) => id !== chosenId); // no duplicates per shop
+    }
+  }
+  while (picks.length < n && entries.length){
+    const total = entries.reduce((s, [,w]) => s + w, 0);
+    if (total <= 0) break;
+    let r = Math.random() * total, idx = 0;
+    for (let i=0;i<entries.length;i++){ r -= entries[i][1]; if (r <= 0){ idx = i; break; } }
+    const [id] = entries.splice(idx,1)[0];
+    picks.push(id);
+  }
+  return picks;
+}
+
+function updateHUD(){
+  elixirEl.textContent = state.elixir;
+  mergesEl.textContent = state.merges;
+  bsEl.textContent = `${state.buys}/${state.sells}`;
+  const net = state.elixir - START_ELIXIR;
+  netEl.textContent = net >= 0 ? `+${net}` : `${net}`;
+}
+
+/* Build a card DOM node */
+function cardNode(id, star, cost, showSell=false, onSell=null, isShop=false){
+  const div = document.createElement('div');
+  div.className = 'card';
+
+  const img = document.createElement('img');
+  img.src = TROOPS[id].img; img.alt = id;
+
+  // shop cost droplet (bench doesn't get a cost badge)
+  let badge = null;
+  if (isShop) {
+    badge = document.createElement('div');
+    badge.className = 'badge drop';
+    badge.textContent = cost;
+  }
+
+  // stars: bench shows layered star(s) top-left; shop hides star
+  let starNode = null;
+  if (!isShop) {
+    const level = Math.max(1, Math.min(3, star || 1));
+    const wrap = document.createElement('div');
+    wrap.className = 'stars';
+    for (let i=0;i<level;i++){
+      const sWrap = document.createElement('div'); sWrap.className = 'starWrap';
+      const sCore = document.createElement('div'); sCore.className = `starCore star-${level}`;
+      sWrap.appendChild(sCore); wrap.appendChild(sWrap);
+    }
+    starNode = wrap;
+  }
+
+  // append parts safely (avoid "null" text nodes)
+  const parts = [img];
+  if (badge) parts.push(badge);
+  if (starNode) parts.push(starNode);
+  div.append(...parts);
+
+  if (showSell) {
+    const s = document.createElement('div');
+    s.className = 'sell'; s.textContent = 'Sell';
+    s.addEventListener('click', onSell);
+    div.appendChild(s);
+  }
+  return div;
+}
+
+function renderBench(){
+  benchEl.innerHTML = '';
+  for (let i=0;i<state.bench.length;i++){
+    const slot = document.createElement('div'); slot.className='slot';
+    const u = state.bench[i];
+    if (u){
+      const node = cardNode(u.id, u.star, TROOPS[u.id].cost, true, () => sell(i), false);
+      slot.appendChild(node);
+    }
+    benchEl.appendChild(slot);
+  }
+}
+function renderShop(){
+  shopEl.innerHTML = '';
+  // sort lowest cost left → right
+  state.shop.sort((a,b) => TROOPS[a].cost - TROOPS[b].cost);
+  for (let i=0;i<3;i++){
+    const slot = document.createElement('div'); slot.className='slot';
+    const id = state.shop[i];
+    if (id){
+      const node = cardNode(id, 1, TROOPS[id].cost, false, null, true);
+      node.style.cursor='pointer';
+      node.addEventListener('click', () => buy(i));
+      slot.appendChild(node);
+    }
+    shopEl.appendChild(slot);
+  }
+}
+// Animate shop refresh: fade-out old, render new, fade-in
+function refreshShopAnimated(){
+  // trigger fade-out on existing cards
+  shopEl.classList.remove('fade-in');
+  shopEl.classList.add('fade-out');
+
+  setTimeout(() => {
+    shopEl.classList.remove('fade-out');
+
+    // draw new shop & render
+    state.shop = drawFromPool(3);
+    renderShop();
+
+    // fade-in the new cards
+    shopEl.classList.add('fade-in');
+    setTimeout(() => shopEl.classList.remove('fade-in'), 160);
+  }, 120); // matches .12s fade-out
+}
+
+/* Merge repeatedly if any pair exists (same id & star) */
+function tryMerge(){
+  let merged = false, did = true;
+  const flashIndices = [];
+  while (did){
+    did = false;
+    for (let i=0;i<state.bench.length;i++){
+      const A = state.bench[i]; if (!A) continue;
+      for (let j=i+1;j<state.bench.length;j++){
+        const B = state.bench[j]; if (!B) continue;
+        if (A.id===B.id && A.star===B.star && A.star<3){
+          const newStar = A.star+1;
+          state.bench[i] = { id:A.id, star:newStar, totalCost:A.totalCost + B.totalCost };
+          state.bench[j] = null;
+          state.merges++;
+          state.elixir += 2; // Spirit Empress bonus
+          flashIndices.push(i);
+          merged = did = true;
+          break;
+        }
+      }
+      if (did) break;
+    }
+  }
+  if (merged){
+    updateHUD(); renderBench();
+    // flash upgraded cards
+    flashIndices.forEach(idx => {
+      const slot = benchEl.children?.[idx];
+      const card = slot && slot.querySelector('.card');
+      if (card){ card.classList.add('mergeFlash'); setTimeout(()=>card.classList.remove('mergeFlash'), 180); }
+    });
+  }
+  return merged;
+}
+
+/* Buy from shop slot i */
+function buy(slotIndex){
+  if (!state.running) return;
+  const id = state.shop[slotIndex]; if (!id) return;
+  const cost = TROOPS[id].cost;
+  if (state.elixir < cost) return;
+
+  // ensure we can place or immediately merge when bench full
+  const empty = firstEmptyBench();
+  const canInstantMerge = state.bench.some(u => u && u.id===id && u.star===1);
+  if (empty === -1 && !canInstantMerge) return;
+
+  if (!takeFromPool(id,1)) return;
+
+  state.elixir -= cost; state.buys++;
+
+  let lastPlacedIndex = null;
+
+  if (empty !== -1){
+    state.bench[empty] = { id, star:1, totalCost: cost };
+    lastPlacedIndex = empty;
+  } else {
+    // bench full but we have a pair -> do immediate merge
+    for (let k=0;k<state.bench.length;k++){
+      if (state.bench[k] && state.bench[k].id===id && state.bench[k].star===1){
+        state.bench[k] = { id, star:2, totalCost: state.bench[k].totalCost + cost };
+        state.merges++; state.elixir += 2; lastPlacedIndex = k; break;
+      }
+    }
+  }
+
+  updateHUD(); renderBench();
+  tryMerge();          // continue any chain merges
+refreshShopAnimated();
+
+}
+
+/* Sell from bench index */
+function sell(i){
+  const u = state.bench[i]; if (!u) return;
+  // refund = total buy value - 1
+  state.elixir += Math.max(0, u.totalCost - 1);
+  state.sells++;
+
+  // return copies to pool: 1★=1, 2★=2, 3★=4
+  const returnCopies = Math.pow(2, (u.star-1));
+  addToPool(u.id, returnCopies);
+
+  state.bench[i] = null;
+  updateHUD(); renderBench(); renderShop();
+}
+
+/* Timer */
+let rafId = null;
+function startRound(){
+  if (state.running) return;
+  state.running = true;
+  state.startTs = Date.now();
+  function tick(){
+    if (!state.running) return;
+    const elapsed = (Date.now() - state.startTs) / 1000;
+    const p = Math.min(1, elapsed / ROUND_SECS);
+    timerFill.style.width = (p * 100) + '%';
+    if (elapsed >= ROUND_SECS){
+      state.running = false;
+      cancelAnimationFrame(rafId);
+      return;
+    }
+    rafId = requestAnimationFrame(tick);
+  }
+  rafId = requestAnimationFrame(tick);
+}
+
+function resetAll(){
+  cancelAnimationFrame(rafId); state.running=false; timerFill.style.width='0%';
+  state.bench = new Array(5).fill(null);
+  state.elixir = START_ELIXIR; state.merges=0; state.buys=0; state.sells=0;
+
+  resetPool();
+
+  // spawn a random 2-cost on bench (consumes from pool)
+  const cand = TWO_COST_IDS.filter(id => poolCount(id)>0);
+  if (cand.length){
+    const id = cand[Math.floor(Math.random()*cand.length)];
+    takeFromPool(id,1);
+    state.bench[0] = { id, star:1, totalCost: TROOPS[id].cost };
+  }
+
+  state.shop = drawFromPool(3);
+
+  updateHUD(); renderBench(); renderShop();
+}
+
+/* Init + bindings */
+document.getElementById('startBtn').onclick = startRound;
+document.getElementById('resetBtn').onclick = resetAll;
+document.addEventListener('keydown', (e)=>{
+  if (e.code==='Space'){ e.preventDefault(); startRound(); }
+  if (e.key==='1') buy(0);
+  if (e.key==='2') buy(1);
+  if (e.key==='3') buy(2);
+});
+
+resetAll();
+</script>
+</body>
+</html>

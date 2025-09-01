@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Angle Snapping Trainer — v1</title>
+<style>
+  :root{
+    --bg:#0b0f17; --panel:#121826; --ink:#eaf1ff; --muted:#93a1bd; --accent:#5ce1e6; --accent2:#7c4dff; --good:#28d17c; --warn:#ffb020; --bad:#ff5d5d; --line:#1a2236;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+  body{margin:0}
+  .wrap{display:grid;grid-template-columns:1.25fr 0.95fr;gap:16px;min-height:100%;padding:16px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.35);overflow:hidden}
+  header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid #1c2440;background:linear-gradient(180deg,#16203a,#121826)}
+  header h1{font-size:16px;margin:0;font-weight:800;letter-spacing:.3px}
+  header .tiny{font-size:12px;color:var(--muted)}
+  .canvas-wrap{position:relative;height:calc(100% - 54px)}
+  canvas{display:block;width:100%;height:100%;cursor:crosshair}
+
+  /* Ready overlay */
+  .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(1200px 800px at 50% 50%, rgba(16,22,38,.85), rgba(16,22,38,.97));border:1px dashed #2a3350;z-index:2}
+  .overlay .box{max-width:620px;padding:24px;border-radius:16px;background:#0f1527;border:1px solid #212a48;text-align:center}
+  .overlay h2{margin:0 0 10px 0}
+  .overlay p{margin:6px 0 12px 0;color:var(--muted)}
+  .overlay .actions{display:flex;gap:10px;justify-content:center}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border-radius:12px;border:1px solid #263153;background:#0f162b;color:var(--ink);cursor:pointer;font-weight:700}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#06131a;border:0}
+  .btn:active{transform:translateY(1px)}
+  .kbd{font-family:ui-monospace,Menlo,monospace;background:#0a1020;border:1px solid #273058;border-radius:6px;padding:1px 6px;font-size:12px;margin:0 2px;color:#bcd2ff}
+
+  /* HUD */
+  .hud{position:absolute;left:14px;bottom:14px;display:flex;gap:8px;flex-wrap:wrap;z-index:1}
+  .pill{padding:8px 10px;border-radius:12px;background:#0e1528cc;border:1px solid #253053;font-size:12px}
+  .pill .k{color:var(--muted);margin-right:6px}
+  .pill .v{font-feature-settings:"tnum" 1,"ss01" 1;letter-spacing:.2px}
+  .legend{position:absolute;right:14px;bottom:14px;padding:10px 12px;background:#0e1528cc;border:1px solid #253053;border-radius:12px;font-size:12px;color:var(--muted);z-index:1}
+
+  /* Sidebar */
+  .sidebar{display:flex;flex-direction:column}
+  .section{padding:14px 16px;border-bottom:1px solid #1c2440}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .metric{background:#0f162b;border:1px solid #202a4a;border-radius:12px;padding:10px;min-height:70px}
+  .metric h4{margin:0 0 6px 0;font-size:12px;color:var(--muted);font-weight:600}
+  .metric .big{font-size:22px;font-weight:800;letter-spacing:.2px}
+  .metric .sub{font-size:12px;color:var(--muted)}
+  .row{display:flex;gap:10px}
+  .row .metric{flex:1}
+  .settings label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  .settings input[type="range"]{width:100%}
+  .tag{display:inline-block;padding:2px 8px;border-radius:999px;border:1px solid #2a3356;margin-left:8px;color:var(--muted);font-size:11px}
+  .flag{font-weight:800}
+  .flag.good{color:var(--good)} .flag.warn{color:var(--warn)} .flag.bad{color:var(--bad)}
+
+  /* Stages */
+  .stage-list{display:flex;flex-direction:column;gap:8px}
+  .stage{border:1px solid #263153;border-radius:12px;padding:10px;background:#0f162b}
+  .stage h4{margin:0 0 6px 0;font-size:13px}
+  .stage .desc{color:var(--muted);font-size:12px}
+  .stage .status{margin-top:6px;font-size:12px}
+  .stage.active{outline:2px solid var(--accent2)}
+
+  /* Modal */
+  .modal{position:absolute;inset:0;display:none;align-items:center;justify-content:center;background:rgba(5,8,16,.72);backdrop-filter:blur(2px);z-index:3}
+  .modal .box{width:min(560px,92vw);background:#0f1527;border:1px solid #212a48;border-radius:16px;padding:18px}
+  .modal .box h3{margin:0 0 10px 0;font-size:18px}
+  .modal .box p{margin:8px 0;color:#b7c4e6;white-space:pre-line}
+  .modal .actions{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+
+  pre.config{background:#0a1020;border:1px solid #273058;border-radius:10px;padding:10px;font-size:12px;overflow:auto}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <!-- Left: Canvas & overlays -->
+    <div class="card">
+      <header>
+        <h1>Angle Snapping Trainer <span class="tiny">v1</span></h1>
+        <div class="tiny">Pointer Lock • Raw deltas</div>
+      </header>
+      <div class="canvas-wrap">
+        <canvas id="pad" aria-label="Aim path canvas"></canvas>
+
+        <!-- Ready overlay -->
+        <div class="overlay" id="overlay">
+          <div class="box">
+            <h2>Ready to measure your natural rail bias?</h2>
+            <p>We’ll guide you through stages. You don’t need to swipe to the screen edges. Just move side‑to‑side naturally — the goal is to <b>measure</b>, not force perfection.</p>
+            <div class="actions">
+              <button class="btn primary" id="startStageBtnTop">Start Stage 1</button>
+            </div>
+            <p style="margin-top:10px;color:#9bb0df">Tips: <span class="kbd">C</span> clear · <span class="kbd">Space</span> recenter · <span class="kbd">G</span> grid · <span class="kbd">=</span>/<span class="kbd">-</span> draw scale</p>
+          </div>
+        </div>
+
+        <!-- Completion modal -->
+        <div class="modal" id="completeModal" aria-hidden="true">
+          <div class="box">
+            <h3 id="modalTitle">Stage complete!</h3>
+            <p id="modalSummary">Summary metrics…</p>
+            <div id="finalSuggestion" style="display:none; margin-top:10px">
+              <div style="margin-bottom:8px">Suggested Raw Accel rotation: <span class="flag" id="rotVal">0.0°</span></div>
+              <pre class="config" id="configText">{
+  "rotation": 0.0,
+  "notes": "Paste into your Raw Accel profile. Positive rotates counter-clockwise."
+}</pre>
+              <button class="btn" id="copyCfgBtn">Copy config</button>
+            </div>
+            <div class="actions">
+              <button class="btn" id="repeatStageBtn">Repeat stage</button>
+              <button class="btn primary" id="nextStageBtn">Begin next stage</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- HUD -->
+        <div class="hud">
+          <div class="pill"><span class="k">Angle</span><span class="v" id="angleVal">0.00°</span></div>
+          <div class="pill"><span class="k">Drift</span><span class="v" id="driftVal">0.00%</span></div>
+          <div class="pill"><span class="k">Straight</span><span class="v" id="straightVal">100</span></div>
+          <div class="pill"><span class="k">Jitter</span><span class="v" id="jitterVal">0.00°</span></div>
+          <div class="pill"><span class="k">Rate</span><span class="v" id="rateVal">0 Hz</span></div>
+        </div>
+        <div class="legend">Blue = your path • Magenta = best‑fit • Green = 0° rail</div>
+      </div>
+    </div>
+
+    <!-- Right: Sidebar -->
+    <div class="card sidebar">
+      <header>
+        <h1>Stages & Metrics</h1>
+        <div class="tiny">Progress: <span id="progressLabel">0/3</span></div>
+      </header>
+
+      <div class="section" id="stageSection">
+        <div class="stage-list" id="stageList"></div>
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn" id="startStageBtn">Start Stage</button>
+          <button class="btn" id="skipStageBtn">Skip</button>
+          <button class="btn" id="resetBtn">Reset All</button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="grid">
+          <div class="metric">
+            <h4>Angle from horizontal</h4>
+            <div class="big" id="mAngle">0.00°</div>
+            <div class="sub">Principal direction of your recent swipe.</div>
+          </div>
+          <div class="metric">
+            <h4>Drift ratio</h4>
+            <div class="big" id="mDrift">0.00%</div>
+            <div class="sub">|∑Δy| / |∑Δx| · lower is better.</div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="metric">
+            <h4>Straightness</h4>
+            <div class="big" id="mStraight">100</div>
+            <div class="sub">1 − λ₂/λ₁ (PCA). 100 = very straight.</div>
+          </div>
+          <div class="metric">
+            <h4>Angle jitter (1s)</h4>
+            <div class="big" id="mJitter">0.00°</div>
+            <div class="sub">Std dev of instantaneous θ.</div>
+          </div>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <div class="metric">
+            <h4>Effective sample rate</h4>
+            <div class="big" id="mRate">0 Hz</div>
+            <div class="sub">Observed movement event frequency.</div>
+          </div>
+          <div class="metric">
+            <h4>Snap detector</h4>
+            <div class="big flag" id="mSnapFlag">—</div>
+            <div class="sub">Heuristic only.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section settings">
+        <h3 style="margin:0 0 10px 0;font-size:13px">Trainer Settings</h3>
+        <label>Analysis window (seconds) <span id="winOut" class="tag">6.0</span></label>
+<input type="range" id="win" min="1" max="12" step="0.5" value="6" />
+        <label>Angle alert (°) <span id="alertOut" class="tag">1.5°</span></label>
+        <input type="range" id="alert" min="0" max="5" step="0.1" value="1.5" />
+        <label>Draw scale (visual only) <span id="scaleOut" class="tag">0.20×</span></label>
+        <input type="range" id="scale" min="0.05" max="1.50" step="0.05" value="0.35" />
+        <div style="display:flex;gap:8px;margin-top:10px">
+          <button class="btn" id="clearBtn">Clear</button>
+          <button class="btn" id="recenterBtn">Recenter</button>
+          <button class="btn" id="gridBtn">Grid: Off</button>
+        </div>
+        <p style="color:var(--muted);margin-top:10px">Perform natural rails; you don’t need to hit the edges. The tool measures, you don’t force it.</p>
+      </div>
+
+      <div class="section" id="coachSection">
+        <h3 style="margin:0 0 8px 0;font-size:13px">Coach</h3>
+        <div id="coachText" style="color:#b7c4e6;font-size:14px">Click Start Stage to begin.</div>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  // ===== Refs =====
+  const canvas = document.getElementById('pad');
+  const ctx = canvas.getContext('2d');
+  const overlay = document.getElementById('overlay');
+  const startStageBtn = document.getElementById('startStageBtn');
+  const startStageBtnTop = document.getElementById('startStageBtnTop');
+  const skipStageBtn = document.getElementById('skipStageBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const stageList = document.getElementById('stageList');
+  const progressLabel = document.getElementById('progressLabel');
+  const coachText = document.getElementById('coachText');
+// Additional movement gain to use more of the canvas
+  const PATH_GAIN = 1.6;
+  const clearBtn = document.getElementById('clearBtn');
+  const recenterBtn = document.getElementById('recenterBtn');
+  const gridBtn = document.getElementById('gridBtn');
+
+  const win = document.getElementById('win');
+  const winOut = document.getElementById('winOut');
+  const alert = document.getElementById('alert');
+  const alertOut = document.getElementById('alertOut');
+  const scale = document.getElementById('scale');
+  const scaleOut = document.getElementById('scaleOut');
+
+  const angleVal = document.getElementById('angleVal');
+  const driftVal = document.getElementById('driftVal');
+  const straightVal = document.getElementById('straightVal');
+  const jitterVal = document.getElementById('jitterVal');
+  const rateVal = document.getElementById('rateVal');
+  const mAngle = document.getElementById('mAngle');
+  const mDrift = document.getElementById('mDrift');
+  const mStraight = document.getElementById('mStraight');
+  const mJitter = document.getElementById('mJitter');
+  const mRate = document.getElementById('mRate');
+  const mSnapFlag = document.getElementById('mSnapFlag');
+
+  const completeModal = document.getElementById('completeModal');
+  const modalTitle = document.getElementById('modalTitle');
+  const modalSummary = document.getElementById('modalSummary');
+  const nextStageBtn = document.getElementById('nextStageBtn');
+  const repeatStageBtn = document.getElementById('repeatStageBtn');
+  const finalSuggestion = document.getElementById('finalSuggestion');
+  const rotVal = document.getElementById('rotVal');
+  const configText = document.getElementById('configText');
+  const copyCfgBtn = document.getElementById('copyCfgBtn');
+
+  // ===== Canvas & Settings =====
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  let gridOn = false;
+  let drawScale = parseFloat(localStorage.getItem('drawScale')||'0.35');
+  scale.value = drawScale; scaleOut.textContent = `${drawScale.toFixed(2)}×`;
+let angleAlert = 1.5;
+let windowSec  = 6.0;   // smoother, less spiky jitter
+// Stage-completion debounce: require all checks true for a short window
+let okHoldStart = null;       // timestamp when all checks first turned true
+const OK_HOLD_MS = 400;       // how long all checks must remain true
+
+
+  // ===== Trajectory state =====
+  let pts = []; // recent points (analysis window)
+  let deltas = []; // recent deltas (analysis window)
+  let anglesRecent = []; // last 1s for jitter
+  let sampleTimes = []; // last 1s for rate
+  let pos = {x:0,y:0};
+  let locked = false;
+
+  // Per-stage accumulators
+  let stagePts = [];    // all points since stage start (for summaries)
+  let stageDistance = 0;// accumulated distance since stage start
+
+  // Rail width policy (partial width OK)
+  const RAIL_WIDTH_FRACTION = 0.35; // 35% of canvas width per rail
+  let stageMinDistLocked = 0;       // computed at stage start
+
+  // ===== Trainer stages =====
+  const stages = [
+    { id:1, title:'Stage 1 — Baseline', desc:'Natural, relaxed horizontal rails (no edge swipes needed).', status:'pending', params:{ minCrossings:24, targetAngle:0, tolDeg:2.0 } },
+    { id:2, title:'Stage 2 — Consistency', desc:'Keep the same natural feel over more rails. Tighter tolerance and jitter check.', status:'locked', params:{ minCrossings:40, targetAngle:0, tolDeg:1.5, maxJitter:2.0 } },
+    { id:3, title:'Stage 3 — Intentional Offset (+5°)', desc:'Try a slight uphill bias (~+5°).', status:'locked', params:{ minCrossings:24, targetAngle:5.0, tolDeg:1.0 } }
+  ];
+  let activeStageIndex = 0;
+  let railCounter = 0;     // center-line crossings
+  let stageStarted = false;
+  let lastCrossDir = 0;    // +1 rightward, -1 leftward (prevents double-count)
+
+  // ===== Audio (light cue) =====
+  const audio = new (window.AudioContext||window.webkitAudioContext)();
+  function beep(freq=740, dur=0.05, vol=0.05){
+    try{
+      const now=audio.currentTime; const o=audio.createOscillator(); const g=audio.createGain();
+      o.type='square'; o.frequency.value=freq; g.gain.value=vol;
+      o.connect(g).connect(audio.destination);
+      o.start(now); o.stop(now+dur);
+    }catch(e){}
+  }
+
+  // ===== Layout =====
+  function resize(){
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = Math.max(800, Math.floor(rect.width*dpr));
+    canvas.height = Math.max(420, Math.floor(rect.height*dpr));
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    pos.x = rect.width/2; pos.y = rect.height/2;
+  }
+  window.addEventListener('resize', resize, {passive:true});
+  resize();
+
+  // ===== Pointer lock =====
+  function requestLock(){
+    const opts = {unadjustedMovement:true};
+    try{
+      if (canvas.requestPointerLock) {
+        if (canvas.requestPointerLock.length > 0) canvas.requestPointerLock();
+        else canvas.requestPointerLock(opts);
+      }
+    }catch(e){}
+  }
+  function onLockChange(){
+    locked = (document.pointerLockElement === canvas);
+    overlay.style.display = (locked || stageStarted) ? 'none' : 'flex';
+  }
+  document.addEventListener('pointerlockchange', onLockChange);
+  document.addEventListener('pointerlockerror', ()=>{ overlay.style.display='flex'; });
+
+  // ===== Controls =====
+  clearBtn.addEventListener('click', ()=>{ pts.length=0; deltas.length=0; anglesRecent.length=0; sampleTimes.length=0; stagePts.length=0; stageDistance=0; });
+  recenterBtn.addEventListener('click', ()=>{ const r=canvas.getBoundingClientRect(); pos.x=r.width/2; pos.y=r.height/2; });
+  gridBtn.addEventListener('click', ()=>{ gridOn=!gridOn; gridBtn.textContent = `Grid: ${gridOn?'On':'Off'}`; });
+
+  win.addEventListener('input', ()=>{ windowSec=parseFloat(win.value); winOut.textContent = `${windowSec.toFixed(1)}`; });
+  alert.addEventListener('input', ()=>{ angleAlert=parseFloat(alert.value); alertOut.textContent = `${angleAlert.toFixed(1)}°`; });
+  scale.addEventListener('input', ()=>{ drawScale=parseFloat(scale.value); scaleOut.textContent=`${drawScale.toFixed(2)}×`; localStorage.setItem('drawScale', drawScale); });
+
+  document.addEventListener('keydown', (e)=>{
+    const setScale = (s)=>{ drawScale=Math.min(1,Math.max(0.05,Math.round(s*100)/100)); scale.value=drawScale; scaleOut.textContent=`${drawScale.toFixed(2)}×`; localStorage.setItem('drawScale',drawScale); };
+    if (e.code==='KeyC') clearBtn.click();
+    if (e.code==='Space'){ e.preventDefault(); recenterBtn.click(); }
+    if (e.code==='KeyG') gridBtn.click();
+    if ((e.key==='='||e.key==='+') && !e.repeat) setScale(drawScale+0.05);
+    if ((e.key==='-'||e.key==='_') && !e.repeat) setScale(drawScale-0.05);
+
+    // When modal is open, Enter starts next stage
+    if (completeModal.style.display==='flex' && (e.key==='Enter')){
+      nextStageBtn.click();
+    }
+  });
+
+  // ===== Stage UI =====
+  function renderStages(){
+    stageList.innerHTML='';
+    stages.forEach((s,idx)=>{
+      const el=document.createElement('div');
+      el.className=`stage ${idx===activeStageIndex?'active':''}`;
+      el.innerHTML=`<h4>${s.title}</h4><div class="desc">${s.desc}</div><div class="status">Status: <span class="flag ${s.status==='passed'?'good':s.status==='failed'?'bad':s.status==='active'?'warn':''}">${s.status}</span></div>`;
+      stageList.appendChild(el);
+    });
+    progressLabel.textContent = `${stages.filter(x=>x.status==='passed').length}/${stages.length}`;
+  }
+  renderStages();
+
+  function computeMinDistForStage(){
+    const rect = canvas.getBoundingClientRect();
+    const s = stages[activeStageIndex];
+    const rails = Math.max(1, Math.round((s.params.minCrossings||0)/2));
+    return rect.width * RAIL_WIDTH_FRACTION * rails;
+  }
+
+  function startStage(){
+    const s = stages[activeStageIndex]; if (!s) return;
+    if (s.status==='locked') s.status='pending';
+    s.status='active'; stageStarted=true; railCounter=0; lastCrossDir=0;
+    // Reset buffers
+    pts.length=0; deltas.length=0; anglesRecent.length=0; sampleTimes.length=0; stagePts.length=0; stageDistance=0;
+    // Lock min distance target now to avoid moving goalposts
+    // Start each stage from canvas center
+const r = canvas.getBoundingClientRect();
+pos.x = r.width / 2;
+pos.y = r.height / 2;
+
+    stageMinDistLocked = computeMinDistForStage();
+    coachText.textContent = `Stage started: ${s.title}. ${s.desc}`;
+    renderStages();
+    if (!locked) requestLock();
+  }
+
+  function endStage(passed=true){
+    const s = stages[activeStageIndex]; if (!s) return;
+    s.status = passed ? 'passed' : 'failed';
+    stageStarted=false; renderStages();
+
+    const m = getMetrics();
+    const summary = `Angle: ${Math.abs(m.angleDeg).toFixed(2)}°\nDrift: ${(m.drift*100).toFixed(2)}%\nStraightness: ${(m.straightness*100|0)}\nJitter(1s): ${m.jitter.toFixed(2)}°\nRails: ${railCounter}`;
+
+    const isLast = activeStageIndex>=stages.length-1;
+    modalTitle.textContent = passed? 'Stage complete!' : 'Stage failed';
+    modalSummary.textContent = `${s.title}\n\n${summary}`;
+
+    finalSuggestion.style.display = isLast? 'block':'none';
+    if (isLast){
+      const suggested = -m.angleDeg; // counter-bias
+      rotVal.textContent = `${suggested.toFixed(1)}°`;
+      configText.textContent = `{\n  "rotation": ${suggested.toFixed(1)},\n  "notes": "Paste into your Raw Accel profile. Positive rotates counter-clockwise."\n}`;
+    }
+// Release pointer lock so the modal is clickable
+if (document.pointerLockElement === canvas) {
+  document.exitPointerLock();
+}
+// Put focus on the primary action for fast keyboard use
+setTimeout(()=>{ try{ nextStageBtn.focus(); }catch(_){} }, 0);
+
+    // Show modal
+    completeModal.style.display='flex';
+    completeModal.setAttribute('aria-hidden','false');
+  }
+
+  function nextStage(){
+    completeModal.style.display='none';
+    completeModal.setAttribute('aria-hidden','true');
+
+    if (activeStageIndex < stages.length-1){
+      activeStageIndex++;
+      if (stages[activeStageIndex].status==='locked') stages[activeStageIndex].status='pending';
+      renderStages();
+      startStage();
+    } else {
+      coachText.textContent='All stages complete. See rotation suggestion above.';
+      overlay.style.display='flex';
+      document.getElementById('startStageBtnTop').textContent='Restart Stage 1';
+    }
+  }
+
+  function repeatStage(){
+    const s = stages[activeStageIndex]; if(!s) return;
+    if (s.status==='failed'||s.status==='passed') s.status='pending';
+    renderStages();
+    startStage();
+  }
+
+  function skipStage(){
+    const s = stages[activeStageIndex]; if (!s) return;
+    s.status='failed';
+    endStage(false);
+  }
+
+  function resetAll(){
+    stages.forEach((s,i)=>{ s.status = (i===0?'pending':'locked'); });
+    activeStageIndex=0; stageStarted=false; railCounter=0; lastCrossDir=0;
+    overlay.style.display='flex';
+    coachText.textContent='Reset. Click Start Stage to begin.';
+    renderStages();
+  }
+
+  // Button wiring
+  (startStageBtnTop||{}).onclick = startStage;
+  (startStageBtn||{}).onclick = startStage;
+  (skipStageBtn||{}).onclick = skipStage;
+  (resetBtn||{}).onclick = resetAll;
+  nextStageBtn.onclick = nextStage;
+  repeatStageBtn.onclick = ()=>{ completeModal.style.display='none'; repeatStage(); };
+  copyCfgBtn.onclick = async ()=>{
+    try{ await navigator.clipboard.writeText(configText.textContent); copyCfgBtn.textContent='Copied!'; setTimeout(()=>copyCfgBtn.textContent='Copy config',1000);}catch(e){ copyCfgBtn.textContent='Copy failed'; setTimeout(()=>copyCfgBtn.textContent='Copy config',1200);} };
+
+  // ===== Movement capture =====
+  document.addEventListener('mousemove', (e)=>{
+    if (!locked) return;
+    const rect = canvas.getBoundingClientRect();
+    const dx = e.movementX * drawScale * PATH_GAIN;
+    const dy = e.movementY * drawScale * PATH_GAIN;
+
+    pos.x = Math.min(rect.width, Math.max(0, pos.x + dx));
+    pos.y = Math.min(rect.height, Math.max(0, pos.y + dy));
+
+    const t = performance.now();
+    const p = {x:pos.x, y:pos.y, t};
+
+    // Analysis-window buffers
+    pts.push(p);
+    deltas.push({dx,dy,t});
+    if (dx!==0 || dy!==0){ let th = Math.atan2(dy,dx)*180/Math.PI; if (th>90) th-=180; if (th<-90) th+=180; anglesRecent.push({theta:th,t}); }
+    sampleTimes.push(t);
+
+    // Trim windows
+    const cutoff = t - windowSec*1000;
+    while(pts.length && pts[0].t<cutoff) pts.shift();
+    while(deltas.length && deltas[0].t<cutoff) deltas.shift();
+    const cutoff1s = t - 1000;
+    while(anglesRecent.length && anglesRecent[0].t<cutoff1s) anglesRecent.shift();
+    while(sampleTimes.length && sampleTimes[0]<cutoff1s) sampleTimes.shift();
+
+    // Per-stage buffers
+    if (stageStarted){
+      stagePts.push(p);
+      stageDistance += Math.hypot(dx,dy);
+
+      // center-line crossing rails
+      const cx = rect.width/2;
+      const prev = stagePts.length>1 ? stagePts[stagePts.length-2] : null;
+      if (prev){
+        if (prev.x<cx && pos.x>=cx && lastCrossDir!==1){ railCounter++; lastCrossDir=1; beep(630,0.04,0.03); }
+        else if (prev.x>cx && pos.x<=cx && lastCrossDir!==-1){ railCounter++; lastCrossDir=-1; beep(630,0.04,0.03); }
+      }
+    }
+  });
+
+  // ===== Math & metrics =====
+  function pcaAngle(points){
+    if (points.length<2) return {angleDeg:0, straightness:1, axis:{vx:1,vy:0}, centroid:{x:0,y:0}};
+    let sx=0, sy=0; for(const p of points){ sx+=p.x; sy+=p.y; }
+    const n=points.length, mx=sx/n, my=sy/n;
+    let sxx=0, syy=0, sxy=0; for(const p of points){ const dx=p.x-mx, dy=p.y-my; sxx+=dx*dx; syy+=dy*dy; sxy+=dx*dy; }
+    const a=sxx/n, d=syy/n, b=sxy/n, tr=a+d, det=a*d-b*b, tmp=Math.sqrt(Math.max(0,(tr*tr)/4-det));
+    const l1=tr/2+tmp, l2=tr/2-tmp;
+    let vx=1,vy=0; if(Math.abs(b)>1e-12){ vx=b; vy=l1-a; } else { if(a>=d){vx=1;vy=0;} else {vx=0;vy=1;} }
+    const norm=Math.hypot(vx,vy)||1; vx/=norm; vy/=norm;
+    let angle=Math.atan2(vy,vx)*180/Math.PI; if(angle>90) angle-=180; if(angle<-90) angle+=180;
+    const straightness = l1>0 ? Math.max(0,Math.min(1,1-(l2/l1))) : 1;
+    return {angleDeg:angle, straightness, axis:{vx,vy}, centroid:{x:mx,y:my}};
+  }
+  function stdDev(a){ if(a.length<2) return 0; const m=a.reduce((s,x)=>s+x,0)/a.length; const v=a.reduce((s,x)=>s+(x-m)*(x-m),0)/a.length; return Math.sqrt(v); }
+
+  function getMetrics(){
+    const {angleDeg, straightness, axis, centroid} = pcaAngle(pts);
+    let sumX=0, sumY=0; let distWin=0; for(const d of deltas){ sumX+=Math.abs(d.dx); sumY+=Math.abs(d.dy); distWin+=Math.hypot(d.dx,d.dy); }
+    const drift = sumX>0 ? (sumY/sumX) : 0;
+    const jitter = stdDev(anglesRecent.map(a=>a.theta));
+    const rate = sampleTimes.length>1 ? (sampleTimes.length-1)/((sampleTimes[sampleTimes.length-1]-sampleTimes[0])/1000) : 0;
+    return {angleDeg, straightness, axis, centroid, drift, jitter, rate, distWin, stageDistance};
+  }
+
+  function evaluateStage(m){
+    const s = stages[activeStageIndex]; if(!s) return {ok:false};
+    const p = s.params;
+    const crossingsOk = railCounter >= (p.minCrossings||0);
+    const angleOk = Math.abs(m.angleDeg - (p.targetAngle||0)) <= (p.tolDeg||1);
+    const jitterOk = (p.maxJitter!=null) ? (m.jitter <= p.maxJitter) : true;
+    const distOk = (stageMinDistLocked>0) ? (m.stageDistance >= stageMinDistLocked) : true;
+    return {ok: crossingsOk && angleOk && jitterOk && distOk, crossingsOk, angleOk, jitterOk, distOk};
+  }
+
+  // ===== Render loop =====
+  function draw(){
+    const r = canvas.getBoundingClientRect(); const W=r.width, H=r.height;
+    ctx.clearRect(0,0,W,H);
+
+    if (gridOn){ ctx.save(); ctx.lineWidth=1; ctx.strokeStyle='#1d2746'; const step=40; for(let y=0;y<=H;y+=step){ ctx.beginPath(); ctx.moveTo(0,y+0.5); ctx.lineTo(W,y+0.5); ctx.stroke(); } for(let x=0;x<=W;x+=step){ ctx.beginPath(); ctx.moveTo(x+0.5,0); ctx.lineTo(x+0.5,H); ctx.stroke(); } ctx.restore(); }
+
+    // 0° reference
+    ctx.save(); ctx.strokeStyle='rgba(40,209,124,.65)'; ctx.lineWidth=2; ctx.beginPath(); const midY=Math.round(H/2)+0.5; ctx.moveTo(0,midY); ctx.lineTo(W,midY); ctx.stroke(); ctx.restore();
+
+    // Path
+    if (pts.length>=2){ ctx.save(); ctx.lineWidth=2; ctx.strokeStyle='rgba(92,225,230,.9)'; ctx.beginPath(); ctx.moveTo(pts[0].x,pts[0].y); for(let i=1;i<pts.length;i++){ ctx.lineTo(pts[i].x,pts[i].y); } ctx.stroke(); ctx.restore(); }
+
+    // Best-fit line for current window
+    const m = getMetrics();
+    if (pts.length>=2){ const L=Math.max(W,H)*1.2; const {vx,vy}=m.axis; const {x:cx,y:cy}=m.centroid; ctx.save(); ctx.strokeStyle='rgba(124,77,255,0.95)'; ctx.lineWidth=2; ctx.setLineDash([8,6]); ctx.beginPath(); ctx.moveTo(cx - vx*L, cy - vy*L); ctx.lineTo(cx + vx*L, cy + vy*L); ctx.stroke(); ctx.restore(); }
+
+    // HUD
+    const angAbs=Math.abs(m.angleDeg); const straightPct=Math.round(m.straightness*100);
+    angleVal.textContent = `${angAbs.toFixed(2)}°`; driftVal.textContent = `${(m.drift*100).toFixed(2)}%`; straightVal.textContent = `${straightPct}`; jitterVal.textContent = `${m.jitter.toFixed(2)}°`; rateVal.textContent = `${m.rate.toFixed(0)} Hz`;
+    mAngle.textContent = `${angAbs.toFixed(2)}°`; mDrift.textContent = `${(m.drift*100).toFixed(2)}%`; mStraight.textContent = `${straightPct}`; mJitter.textContent = `${m.jitter.toFixed(2)}°`; mRate.textContent = `${m.rate.toFixed(0)} Hz`;
+
+    // Snap heuristic (very rough)
+    const snapLikely = (angAbs<0.25) && (m.drift<0.008) && (m.jitter<0.35) && (m.stageDistance>800);
+    const snapMaybe  = (angAbs<0.5)  && (m.drift<0.015) && (m.jitter<0.6)  && (m.stageDistance>800);
+    let snapText='—', snapClass='flag'; if(snapLikely){snapText='LIKELY'; snapClass='flag good';} else if(snapMaybe){snapText='POSSIBLE'; snapClass='flag warn';} else if(m.stageDistance>800){snapText='UNLIKELY'; snapClass='flag bad';}
+    mSnapFlag.textContent=snapText; mSnapFlag.className=snapClass;
+
+    // Angle alert beep
+    const now=performance.now(); if (angAbs>angleAlert && locked){ if (!window.__beepAt || now-window.__beepAt>500){ window.__beepAt=now; if (audio.state==='suspended') audio.resume().then(()=>beep()); else beep(); } }
+
+if (stageStarted){
+  const ev   = evaluateStage(m);
+  const s    = stages[activeStageIndex];
+  const tgt  = s.params.targetAngle || 0;
+  const dAng = (m.angleDeg - tgt);
+  const deltaStr = dAng.toFixed(2);
+
+  // Always show a live checklist so nothing "disappears"
+  const crossStr = `${railCounter}/${s.params.minCrossings}`;
+  const distStr  = `${Math.round(m.stageDistance)}/${Math.round(stageMinDistLocked)}`;
+  const angStr   = `Δ ${deltaStr}° (±${s.params.tolDeg}°)`;
+  const jitStr   = (s.params.maxJitter != null)
+      ? `${m.jitter.toFixed(2)}° ≤ ${s.params.maxJitter}°`
+      : `${m.jitter.toFixed(2)}°`;
+
+  const check = (ok, label) => (ok ? `✅ ${label}` : `⏳ ${label}`);
+
+  coachText.textContent =
+    `${s.title} — ` +
+    [
+      check(ev.crossingsOk, `crossings ${crossStr}`),
+      check(ev.distOk,      `distance ${distStr}`),
+      check(ev.angleOk,     `angle ${angStr}`),
+      (s.params.maxJitter != null ? check(ev.jitterOk, `jitter ${jitStr}`) : `jitter ${jitStr}`)
+    ].join('  •  ');
+
+  // Hold-to-complete: require all checks true for OK_HOLD_MS
+  const now = performance.now();
+  if (ev.ok) {
+    if (okHoldStart == null) okHoldStart = now;
+    if (now - okHoldStart >= OK_HOLD_MS) {
+      okHoldStart = null;
+      endStage(true);
+    }
+  } else {
+    okHoldStart = null; // reset if anything fails again
+  }
+}
+
+    requestAnimationFrame(draw);
+  }
+  requestAnimationFrame(draw);
+
+  // ===== Init stage list =====
+  renderStages();
+
+  // ===== Support =====
+  if (!('pointerLockElement' in document)){
+    // Very old browsers
+    document.querySelectorAll('button').forEach(b=>b.disabled=false);
+  }
+})();
+</script>
+</body>
+</html>

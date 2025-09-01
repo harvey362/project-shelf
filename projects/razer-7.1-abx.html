@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Razer 7.1 vs Browser HRTF — A/B/X Surround Test</title>
+<style>
+:root{
+  --bg:#0b0f17; --panel:#121826; --ink:#eaf1ff; --muted:#93a1bd; --accent:#5ce1e6; --accent2:#7c4dff;
+  --good:#28d17c; --warn:#ffb020; --bad:#ff5d5d; --ring:#1a2236; --glow:#5ce1e64d;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:radial-gradient(1200px 600px at 70% -10%, #0f1726 0%, #0b0f17 60%);
+  color:var(--ink); font:14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial;}
+header{padding:16px 18px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+  background:linear-gradient(180deg,#0f1524 0%,#0b0f17 100%); border-bottom:1px solid #101626}
+h1{font-size:18px; margin:0; letter-spacing:.3px; font-weight:650}
+.badge{font-size:12px; color:var(--muted); border:1px solid #22304d; padding:4px 8px; border-radius:999px}
+main{display:grid; grid-template-columns: 1.2fr .9fr; gap:16px; padding:16px; max-width:1200px; margin:0 auto}
+@media (max-width: 1000px){ main{grid-template-columns:1fr} }
+.card{background:linear-gradient(180deg,#0f1524,#0c111b); border:1px solid #11192c; border-radius:16px; box-shadow:0 10px 30px #0006}
+.section{padding:14px}
+h2{font-size:13px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); margin:0 0 8px}
+.row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+select,button,input[type="number"],input[type="range"]{
+  background:#0d1423; border:1px solid #162039; color:var(--ink); border-radius:10px; padding:8px 10px; font-weight:500
+}
+button{cursor:pointer; transition:transform .05s ease, filter .15s ease}
+button:hover{transform:translateY(-1px)}
+.btn{background:linear-gradient(180deg,#133050,#0d1f33); border-color:#1c4167}
+.btn-warn{background:linear-gradient(180deg,#3a2a12,#251b0f); border-color:#6a4d1d}
+.btn-good{background:linear-gradient(180deg,#123a27,#0f251b); border-color:#1d6a49}
+.note{color:var(--muted); font-size:13px}
+hr{border:none; height:1px; background:linear-gradient(90deg,transparent,#162039,transparent); margin:10px 0}
+kbd{background:#0f182b; border:1px solid #172544; padding:.2em .4em; border-radius:6px}
+/* Stage */
+#stage{position:relative; aspect-ratio:1/1; width:100%; max-width:700px; margin:0 auto;}
+.ring{position:absolute; inset:4% 4%; border-radius:50%;
+  background:radial-gradient(closest-side,#0e1423 88%,transparent 90%), radial-gradient(closest-side,#0e1423 96%,transparent 98%),
+             radial-gradient(circle at 50% 50%, transparent 0 68%, #0c111b 68.3%);
+  box-shadow: inset 0 0 0 2px var(--ring), inset 0 0 30px #00000060;
+}
+.speaker{
+  position:absolute; width:90px; height:90px; border-radius:14px;
+  background:linear-gradient(180deg,#10192c,#0a1020); border:1px solid #19284a;
+  display:flex; align-items:center; justify-content:center; text-align:center; padding:8px;
+  color:#c6d4f3; font-weight:700; letter-spacing:.4px; text-transform:uppercase; font-size:12px;
+  box-shadow:0 10px 25px #0006, inset 0 0 0 1px #0d1a33;
+}
+.speaker .small{font-weight:600; color:#8fb7ff; font-size:10px; display:block}
+.speaker.active{box-shadow:0 0 0 0 #0000, 0 0 18px 6px var(--glow); border-color:#2f6ab9}
+.centerDot{position:absolute; left:50%; top:50%; width:12px; height:12px; transform:translate(-50%,-50%); border-radius:50%;
+  background:#203053; box-shadow:0 0 0 2px #15223d,0 0 20px #000}
+.table{width:100%; border-collapse:collapse; font-size:13px}
+.table th,.table td{border-bottom:1px solid #162039; padding:8px 6px; text-align:left; color:#cfe0ff}
+.table th{color:#94a7c9; text-transform:uppercase; font-size:12px; letter-spacing:.08em}
+.tag{padding:2px 6px; border-radius:999px; font-size:12px; border:1px solid #1d3056; background:#0d1423; color:#9fb7e6}
+.stat{display:flex; gap:6px; align-items:center}
+.stat b{font-size:16px}
+.export{white-space:pre-wrap; background:#0d1423; border:1px solid #162039; padding:10px; border-radius:10px; color:#bcd0f5}
+</style>
+</head>
+<body>
+<header>
+  <h1>Razer 7.1 vs Browser HRTF — A/B/X Test</h1>
+  <span class="badge">Single-file • Offline • WebAudio</span>
+  <div class="note">Switch your Windows output device between <b>Headset (Direct)</b> and <b>Razer 7.1 Surround</b> to compare system driver vs browser-only spatialization.</div>
+</header>
+
+<main>
+  <section class="card section">
+    <h2>Stage</h2>
+    <div id="stage">
+      <div class="ring"></div>
+      <div class="centerDot" title="Listener (you)"></div>
+    </div>
+    <div class="section">
+      <div class="row" style="justify-content:center; gap:8px">
+        <button class="btn" id="playAll">Play All (clockwise)</button>
+        <button class="btn" id="startRotate">Start Rotate</button>
+        <button class="btn-warn" id="stopAll">Stop</button>
+      </div>
+      <div class="note" style="text-align:center; margin-top:6px">Hotkeys: <kbd>Space</kbd> repeat • <kbd>R</kbd> rotate • <kbd>S</kbd> stop</div>
+    </div>
+  </section>
+
+  <aside class="card section">
+    <h2>Controls</h2>
+    <div class="row" style="gap:10px">
+      <label class="tag">Current Windows output (for log):</label>
+      <select id="deviceTag">
+        <option>Headset (Direct)</option>
+        <option>Razer 7.1 Surround</option>
+      </select>
+    </div>
+    <hr>
+    <div class="row">
+      <label class="tag">Pipeline:</label>
+      <select id="pipeline">
+        <option value="stereo">A = Neutral Stereo (no HRTF)</option>
+        <option value="hrtf">B = Browser HRTF (spatial)</option>
+      </select>
+      <label class="tag">Cue:</label>
+      <select id="cue">
+        <option value="foot">Footstep (thump)</option>
+        <option value="noise">Pink-ish noise</option>
+        <option value="click">Click (2 kHz)</option>
+        <option value="beep">Beep (1 kHz)</option>
+        <option value="sweep">Sweep (500→2k)</option>
+        <option value="lfe">LFE Bass (40–80 Hz)</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <label class="tag">Level (dB)</label><input id="gainDb" type="range" min="-36" max="0" step="1" value="-8">
+      <label class="tag">Duration (ms)</label><input id="durMs" type="range" min="60" max="1200" step="10" value="220">
+      <label class="tag">Repeats</label><input id="repeats" type="number" min="1" max="6" step="1" value="2">
+      <label class="tag">Interval (ms)</label><input id="intervalMs" type="number" min="60" max="2000" step="10" value="180">
+    </div>
+
+    <hr>
+    <h2>A/B/X Blind Test</h2>
+    <div class="note">Pick a direction, then start ABX. The app will randomly play either pipeline A (Stereo) or B (HRTF) as X. Decide which pipeline X was.</div>
+    <div class="row" style="margin:6px 0">
+      <label class="tag">Direction:</label>
+      <select id="abxDir"></select>
+      <button class="btn-good" id="abxStart">Start ABX</button>
+      <button class="btn" id="abxReplay">Replay X</button>
+      <button class="btn-warn" id="abxStop">End ABX</button>
+    </div>
+    <div class="row" style="gap:8px">
+      <button class="btn" id="abxChooseA">X was A (Stereo)</button>
+      <button class="btn" id="abxChooseB">X was B (HRTF)</button>
+    </div>
+
+    <hr>
+    <h2>Results</h2>
+    <table class="table" id="logTable">
+      <thead><tr><th>Time</th><th>Device</th><th>Dir</th><th>Pipeline X</th><th>Guess</th><th>Correct?</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    <div class="row" style="justify-content:space-between; margin-top:8px">
+      <div class="stat"><span class="tag">Accuracy (this session)</span> <b id="acc">–</b></div>
+      <button class="btn" id="exportCsv">Export CSV</button>
+      <button class="btn-warn" id="clearLog">Clear</button>
+    </div>
+    <pre class="export" id="csvOut" style="display:none"></pre>
+  </aside>
+</main>
+
+<footer class="note" style="text-align:center; padding:12px">Tip: For fair comparison, run a block on <b>Headset (Direct)</b>, then switch Windows to <b>Razer 7.1 Surround</b> and repeat the same ABX runs.</footer>
+
+<script>
+(() => {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)({latencyHint:'interactive'});
+
+  // Geometry
+  const speakers = [
+    { id:'C',  label:'Center',        deg: 0 },
+    { id:'FL', label:'Front Left',    deg:-30 },
+    { id:'FR', label:'Front Right',   deg: 30 },
+    { id:'SL', label:'Side Left',     deg:-90 },
+    { id:'SR', label:'Side Right',    deg: 90 },
+    { id:'RL', label:'Rear Left',     deg:-150 },
+    { id:'RR', label:'Rear Right',    deg: 150 },
+    { id:'LFE',label:'LFE (.1)',      deg:null }
+  ];
+  const stage = document.getElementById('stage');
+  const radiusPct = 46;
+  speakers.forEach(sp=>{
+    const el = document.createElement('button');
+    el.className = 'speaker'; el.dataset.id = sp.id;
+    el.innerHTML = sp.id==='LFE' ? 'LFE<span class="small">Sub</span>' : sp.id + '<span class="small">'+sp.label+'</span>';
+    if (sp.deg!==null){
+      const d = sp.deg*Math.PI/180; const x=Math.sin(d), z=Math.cos(d);
+      el.style.left = (50 + x*radiusPct)+'%';
+      el.style.top  = (50 + (-z)*radiusPct)+'%';
+      el.style.transform = 'translate(-50%,-50%)';
+    } else { el.style.left='50%'; el.style.top='92%'; el.style.transform='translate(-50%,-50%)'; }
+    el.addEventListener('click', ()=>playFromSpeaker(sp));
+    stage.appendChild(el); sp.el = el;
+  });
+
+  // Controls
+  const deviceTag = document.getElementById('deviceTag');
+  const pipelineSel = document.getElementById('pipeline');
+  const cueSel = document.getElementById('cue');
+  const gainDb = document.getElementById('gainDb');
+  const durMs = document.getElementById('durMs');
+  const repeats = document.getElementById('repeats');
+  const intervalMs = document.getElementById('intervalMs');
+
+  const playAllBtn = document.getElementById('playAll');
+  const startRotateBtn = document.getElementById('startRotate');
+  const stopAllBtn = document.getElementById('stopAll');
+
+  // ABX
+  const abxDirSel = document.getElementById('abxDir');
+  const abxStart = document.getElementById('abxStart');
+  const abxReplay = document.getElementById('abxReplay');
+  const abxStop = document.getElementById('abxStop');
+  const abxChooseA = document.getElementById('abxChooseA');
+  const abxChooseB = document.getElementById('abxChooseB');
+  const logTable = document.getElementById('logTable').querySelector('tbody');
+  const accEl = document.getElementById('acc');
+  const exportBtn = document.getElementById('exportCsv');
+  const clearBtn = document.getElementById('clearLog');
+  const csvOut = document.getElementById('csvOut');
+
+  // Fill ABX directions
+  speakers.filter(s=>s.id!=='LFE').forEach(sp=>{
+    const opt = document.createElement('option');
+    opt.value = sp.id; opt.textContent = `${sp.id} (${sp.label})`;
+    abxDirSel.appendChild(opt);
+  });
+
+  // Audio helpers
+  function dbToGain(db){ return Math.pow(10, db/20); }
+  function mkGain(valueDb){ const g=ctx.createGain(); g.gain.value=dbToGain(valueDb); return g; }
+  function mkEnvelope(dest, ms){
+    const now = ctx.currentTime; const g = ctx.createGain();
+    g.gain.setValueAtTime(0, now);
+    const dur = Math.max(0.02, ms/1000);
+    const a = Math.min(0.01, dur*0.1);
+    const r = Math.max(0.03, dur*0.35);
+    g.gain.linearRampToValueAtTime(1, now + a);
+    g.gain.setTargetAtTime(0, now + a, r);
+    g.connect(dest); return g;
+  }
+  function mkStereoPanner(deg){
+    const p = ctx.createStereoPanner();
+    p.pan.value = Math.sin(deg*Math.PI/180);
+    return p;
+  }
+  function mkPannerHRTF(deg){
+    const p = ctx.createPanner();
+    p.panningModel = 'HRTF';
+    p.distanceModel = 'inverse';
+    p.refDistance = 1; p.maxDistance = 50; p.rolloffFactor = 1.2;
+    const rad = deg*Math.PI/180; const x=Math.sin(rad); const z=-Math.cos(rad);
+    p.positionX.value = x; p.positionY.value=0; p.positionZ.value=z;
+    return p;
+  }
+  function noiseBuffer(seconds = 1.0){
+    const rate = ctx.sampleRate; const len = Math.floor(rate * seconds);
+    const buf = ctx.createBuffer(1, len, rate); const data = buf.getChannelData(0);
+    let b0=0,b1=0,b2=0,b3=0,b4=0,b5=0,b6=0;
+    for (let i=0;i<len;i++){
+      const white = Math.random()*2-1;
+      b0 = 0.99886*b0 + white*0.0555179;
+      b1 = 0.99332*b1 + white*0.0750759;
+      b2 = 0.96900*b2 + white*0.1538520;
+      b3 = 0.86650*b3 + white*0.3104856;
+      b4 = 0.55000*b4 + white*0.5329522;
+      b5 = -0.7616*b5 - white*0.0168980;
+      const pink = b0+b1+b2+b3+b4+b5+b6 + white*0.5362;
+      b6 = white*0.115926;
+      data[i] = 0.11 * pink;
+    }
+    return buf;
+  }
+  function srcForCue(cue){
+    if (cue==='foot'){
+      const src = ctx.createBufferSource(); src.buffer=noiseBuffer(0.5);
+      const lpf = ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=320;
+      src.connect(lpf); return { out:lpf, src };
+    } else if (cue==='noise'){
+      const src = ctx.createBufferSource(); src.buffer=noiseBuffer(1.0);
+      return { out:src, src };
+    } else if (cue==='click'){
+      const osc = ctx.createOscillator(); osc.type='square'; osc.frequency.value=2000;
+      return { out:osc, src:osc };
+    } else if (cue==='beep'){
+      const osc = ctx.createOscillator(); osc.type='sine'; osc.frequency.value=1000;
+      return { out:osc, src:osc };
+    } else if (cue==='sweep'){
+      const osc = ctx.createOscillator(); osc.type='sine';
+      const d = Math.max(0.05, parseInt(durMs.value)/1000);
+      osc.frequency.setValueAtTime(500, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(2000, ctx.currentTime + d);
+      return { out:osc, src:osc };
+    } else if (cue==='lfe'){
+      const osc = ctx.createOscillator(); const dur=Math.max(0.12, parseInt(durMs.value)/1000);
+      const base=40; osc.type='sine'; osc.frequency.value=base;
+      try{ osc.frequency.setValueAtTime(base, ctx.currentTime); osc.frequency.exponentialRampToValueAtTime(80, ctx.currentTime + dur*0.6);}catch(e){}
+      return { out:osc, src:osc };
+    }
+  }
+  function flash(el){ el.classList.add('active'); setTimeout(()=>el.classList.remove('active'), 240); }
+
+  async function playBurst(deg, mode){
+    await ctx.resume();
+    const cue = cueSel.value; const dur = Math.max(60, parseInt(durMs.value));
+    const n = Math.max(1, parseInt(repeats.value)||1);
+    const interval = Math.max(60, parseInt(intervalMs.value)||180);
+    for (let i=0;i<n;i++){
+      const when = ctx.currentTime + i*(interval/1000);
+      if (cue==='lfe' || deg==null){
+        const { out, src } = srcForCue('lfe');
+        const g=mkGain(parseInt(gainDb.value)); const env = mkEnvelope(ctx.destination, dur);
+        out.connect(g).connect(env); src.start(when); src.stop(when + Math.max(0.12, dur/1000));
+      } else {
+        const { out, src } = srcForCue(cue);
+        const g=mkGain(parseInt(gainDb.value));
+        const node = (mode==='stereo') ? mkStereoPanner(deg) : mkPannerHRTF(deg);
+        const env = mkEnvelope(g, dur);
+        out.connect(g).connect(node).connect(ctx.destination);
+        src.start(when); src.stop(when + Math.max(0.08, dur/1000));
+      }
+    }
+  }
+  async function playFromSpeaker(sp){
+    stopRotate();
+    await playBurst(sp.deg, pipelineSel.value);
+    flash(sp.el);
+    lastAction = ()=>playFromSpeaker(sp);
+  }
+
+  // All clockwise
+  const order = speakers.filter(s=>s.id!=='LFE').sort((a,b)=>a.deg-b.deg);
+  async function playAll(){
+    stopRotate();
+    await ctx.resume();
+    const gap = Math.max(0.22, parseInt(intervalMs.value)/1000 + parseInt(durMs.value)/1000 * .6);
+    order.forEach((sp, idx)=> setTimeout(()=>{ playFromSpeaker(sp); }, idx*gap*1000) );
+    setTimeout(()=>playBurst(null,'stereo'), order.length*gap*1000 + 250); // LFE at end
+    lastAction = playAll;
+  }
+
+  // Rotate
+  let rotating=false, raf=null, node=null, src=null, env=null;
+  async function startRotate(){
+    if (rotating) return; rotating=true; startRotateBtn.textContent='Stop Rotate';
+    await ctx.resume();
+    const cue = cueSel.value==='lfe' ? 'noise' : cueSel.value;
+    const { out, src:osc } = srcForCue(cue); src=osc;
+    node = pipelineSel.value==='stereo' ? mkStereoPanner(0) : mkPannerHRTF(0);
+    const g=mkGain(parseInt(gainDb.value)-6); env = mkEnvelope(g, 30000);
+    out.connect(g).connect(node).connect(ctx.destination); src.loop=true; src.start();
+    const t0 = performance.now();
+    function tick(t){
+      if (!rotating) return;
+      const lap=6000; const phase=((t-t0)%lap)/lap; const deg=phase*360;
+      if (node.positionX){ const rad=deg*Math.PI/180; node.positionX.value=Math.sin(rad); node.positionZ.value=-Math.cos(rad); }
+      else { node.pan.value = Math.sin(deg*Math.PI/180); }
+      raf=requestAnimationFrame(tick);
+    }
+    raf=requestAnimationFrame(tick);
+  }
+  function stopRotate(){
+    rotating=false; startRotateBtn.textContent='Start Rotate';
+    if (raf) cancelAnimationFrame(raf); raf=null;
+    try{ src && src.stop(); }catch(e){}
+    src=null; node=null; env=null;
+  }
+
+  playAllBtn.addEventListener('click', playAll);
+  startRotateBtn.addEventListener('click', ()=> rotating?stopRotate():startRotate());
+  stopAllBtn.addEventListener('click', stopRotate);
+  window.addEventListener('keydown', e=>{
+    if (e.code==='Space'){ e.preventDefault(); lastAction && lastAction(); }
+    if (e.key==='r' || e.key==='R'){ rotating?stopRotate():startRotate(); }
+    if (e.key==='s' || e.key==='S'){ stopRotate(); }
+  });
+
+  // ABX logic
+  let abxActive=false, abxSecret='A', abxDeg=0, lastAction=null;
+  function randChoice(){ return Math.random()<0.5 ? 'A' : 'B'; }
+  abxStart.addEventListener('click', async ()=>{
+    abxActive=true; abxSecret = randChoice();
+    const dirId = abxDirSel.value; const sp = speakers.find(s=>s.id===dirId);
+    abxDeg = sp.deg;
+    await ctx.resume();
+    // Present reference A then B (user can replay X later)
+    await playBurst(abxDeg, 'stereo'); await delay(200);
+    await playBurst(abxDeg, 'hrtf');
+    await delay(300);
+    await playX();
+  });
+  async function playX(){
+    if (!abxActive) return;
+    const mode = (abxSecret==='A') ? 'stereo' : 'hrtf';
+    await playBurst(abxDeg, mode);
+    lastAction = playX;
+  }
+  abxReplay.addEventListener('click', playX);
+  abxStop.addEventListener('click', ()=>{ abxActive=false; });
+
+  abxChooseA.addEventListener('click', ()=> decide('A'));
+  abxChooseB.addEventListener('click', ()=> decide('B'));
+  function decide(guess){
+    if (!abxActive) return;
+    const correct = (guess===abxSecret);
+    appendLog(new Date(), deviceTag.value, abxDeg, abxSecret, guess, correct);
+    abxActive=false;
+  }
+  function delay(ms){ return new Promise(res=>setTimeout(res, ms)); }
+
+  // Logging
+  let rows=[];
+  function fmtTime(d){ return d.toLocaleTimeString(); }
+  function dirFromDeg(deg){
+    const sp = speakers.find(s=>s.deg===deg);
+    return sp ? sp.id : 'LFE/NA';
+  }
+  function appendLog(time, device, deg, secret, guess, correct){
+    rows.push({time, device, dir:dirFromDeg(deg), secret, guess, correct});
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${fmtTime(time)}</td><td>${device}</td><td>${dirFromDeg(deg)}</td>
+                    <td>${secret}</td><td>${guess}</td><td>${correct?'✅':'❌'}</td>`;
+    logTable.appendChild(tr);
+    updateAcc();
+  }
+  function updateAcc(){
+    if (!rows.length){ accEl.textContent='–'; return; }
+    const ok = rows.filter(r=>r.correct).length;
+    accEl.textContent = Math.round(ok/rows.length*100) + '%';
+  }
+  exportBtn.addEventListener('click', ()=>{
+    const header = 'time,device,dir,X_pipeline,guess,correct\\n';
+    const csv = header + rows.map(r=>[r.time.toISOString(), r.device, r.dir, r.secret, r.guess, r.correct].join(',')).join('\\n');
+    csvOut.textContent = csv; csvOut.style.display='block';
+    const blob = new Blob([csv], {type:'text/csv'});
+    const a = document.createElement('a');
+    a.download = 'abx_results.csv'; a.href = URL.createObjectURL(blob); a.click();
+    setTimeout(()=>URL.revokeObjectURL(a.href), 1000);
+  });
+  clearBtn.addEventListener('click', ()=>{ rows=[]; logTable.innerHTML=''; updateAcc(); csvOut.style.display='none'; });
+
+  // Utility
+  function setFlash(el){ el.style.boxShadow='0 0 0 2px #5ce1e63a'; clearTimeout(el._t); el._t=setTimeout(()=> el.style.boxShadow='none', 400); }
+  [deviceTag, pipelineSel, cueSel, gainDb, durMs, repeats, intervalMs].forEach(el=>{
+    el.addEventListener('input', ()=>{ const lab=el; setFlash(lab); });
+  });
+
+})();</script>
+
+<!--
+Protocol for Fair Comparison (5 steps)
+1) In Windows Sound, set output to "Headset (Direct)". In the app, set Device = Headset (Direct).
+2) Pick Direction = "SL" or "SR" (side) and Cue = "Footstep". Run 10 ABX trials (guess if X is A or B). Export CSV.
+3) Switch Windows output to "Razer 7.1 Surround". Set Device = Razer 7.1 Surround. Repeat the same 10 ABX trials (same direction & cue).
+4) Compare accuracy: if accuracy rises notably with Razer 7.1, its driver spatialization is helping for that cue/direction.
+5) Try multiple directions (rear/diagonal) and cues (noise vs footstep). Keep Chrome volume fixed; control level via app slider or system.
+-->
+</body>
+</html>

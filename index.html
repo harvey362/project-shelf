@@ -97,7 +97,7 @@ If you change filenames, just edit the ITEMS list in the <script> at the bottom.
     <div id="empty" class="empty" style="display:none">No matches. Try clearing search or tags.</div>
   </div>
 
-  <div class="footer"><div class="hint">Tip: Put your projects in <b>/projects/</b>. Links open in a new tab.</div></div>
+  </div>
 
 <script>
 (function(){
@@ -109,35 +109,40 @@ If you change filenames, just edit the ITEMS list in the <script> at the bottom.
       filename: 'Aim Rotation Finder.html',
       desc: 'Find your natural horizontal aim bias and suggested correction.',
       tags: ['aim','trainer'],
-      accent: '#66e3c4'
+      accent: '#66e3c4',
+      thumb: './thumbs/aim-rotation.png' // optional; if missing, a gradient tile is generated
     },
     {
       title: 'Harveys Epic Cycle Tracker',
       filename: 'Harveys Epic Cycle Tracker.html',
       desc: 'Clash Royale elixir/cards-in-hand tracker built for Merge Tactics mode.',
       tags: ['clash','tools'],
-      accent: '#82aaff'
+      accent: '#82aaff',
+      thumb: './thumbs/cycle-tracker.png'
     },
     {
       title: 'Razer 7.1 ABX',
       filename: 'razer-7.1-abx.html',
       desc: 'ABX-style tester for surround vs stereo perception.',
       tags: ['audio','tools'],
-      accent: '#ffa928'
+      accent: '#ffa928',
+      thumb: './thumbs/razer-abx.png'
     },
     {
       title: 'Shadow Teacher',
       filename: 'shadow teacher.html',
       desc: 'Draw an object and learn how to place its reflections and shadows.',
       tags: ['art','learning'],
-      accent: '#a6e3a1'
+      accent: '#a6e3a1',
+      thumb: './thumbs/shadow-teacher.png'
     },
     {
       title: 'Merge 4.1',
       filename: 'merge4.1.html',
       desc: 'Experimental Merge mechanics sandbox.',
       tags: ['prototype','games'],
-      accent: '#f38ba8'
+      accent: '#f38ba8',
+      thumb: './thumbs/merge4-1.png'
     }
   ];
 
@@ -200,7 +205,9 @@ If you change filenames, just edit the ITEMS list in the <script> at the bottom.
   function card(item){
     const a = document.createElement('a'); a.className='card'; a.href=urlFor(item.filename); a.target='_blank'; a.rel='noopener';
     const th = document.createElement('div'); th.className='thumb';
-    const img = new Image(); img.src = makeThumbSVG(item.title, item.accent||'#66e3c4'); img.alt='thumbnail'; th.appendChild(img);
+    const img = new Image(); img.alt='thumbnail';
+    if(item.thumb){ img.src = item.thumb; } else { img.src = makeThumbSVG(item.title, item.accent||'#66e3c4'); }
+    th.appendChild(img);
     const b = document.createElement('div'); b.className='badge'; b.textContent = (item.tags?.[0]||'project'); th.appendChild(b);
     a.appendChild(th);
 

@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Harvey’s Project Shelf</title>
+<!--
+GitHub Pages ready, single-file index.html for your public project shelf.
+Place this file at the repo root and your projects in /projects/.
+It renders a modern, dark, responsive gallery with search + tag filtering.
+No external libraries. Links open in a new tab.
+
+Folder structure:
+  / (repo root)
+   ├─ index.html   ← this file
+   └─ projects/
+       ├─ Aim Rotation Finder.html
+       ├─ Harveys Epic Cycle Tracker.html
+       ├─ razer-7.1-abx.html
+       ├─ shadow teacher.html
+       └─ merge4.1.html
+
+If you change filenames, just edit the ITEMS list in the <script> at the bottom.
+-->
+<style>
+  :root{
+    --bg:#0b0f14; --bg-2:#0d121b; --ink:#e8f0ff; --muted:#9eb0c9; --line:#1b263a;
+    --accent:#66e3c4; --accent-2:#82aaff; --bad:#ff6b6b; --ok:#2fd39c; --shadow:rgba(0,0,0,.45);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:radial-gradient(1200px 800px at 80% -120px,#142033 0%,#0b0f14 55%);
+       color:var(--ink);font-family:ui-sans-serif,system-ui,"Segoe UI",Inter,Roboto,Arial}
+  a{color:inherit;text-decoration:none}
+
+  .wrap{max-width:1200px;margin:0 auto;padding:28px 16px 64px}
+  header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:14px}
+  .brand{display:flex;gap:10px;align-items:center}
+  .dot{width:12px;height:12px;border-radius:50%;background:var(--accent);box-shadow:0 0 18px var(--accent)}
+  .title{font-weight:800;font-size:20px;letter-spacing:.3px}
+  .actions{display:flex;gap:8px;align-items:center}
+
+  .search{flex:1;display:flex;align-items:center;gap:8px;background:linear-gradient(180deg,#111827,#0b111b);
+    border:1px solid #1d2840;border-radius:12px;padding:8px 10px;box-shadow:inset 0 0 0 1px #0b1220;min-width:220px}
+  .search input{flex:1;background:transparent;border:none;outline:none;color:var(--ink);font-size:14px}
+  .chipbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 6px}
+  .chip{display:inline-flex;gap:6px;align-items:center;border:1px solid #27324b;background:#0f1727;border-radius:999px;
+    padding:6px 10px;color:var(--muted);font-weight:700;font-size:12px;cursor:pointer}
+  .chip.active{background:#16233a;color:var(--ink);border-color:#314266}
+
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+  .card{background:linear-gradient(180deg,#121a2a,#0d1422);border:1px solid #1a2742;border-radius:16px;overflow:hidden;
+    box-shadow:0 10px 28px var(--shadow);transition:transform .15s ease, box-shadow .15s ease}
+  .card:hover{transform:translateY(-2px);box-shadow:0 14px 36px var(--shadow)}
+  .thumb{position:relative;aspect-ratio:16/9;background:#0e1525;display:flex;align-items:center;justify-content:center}
+  .thumb img{width:100%;height:100%;object-fit:cover}
+  .thumb .svg{width:100%;height:100%;display:block}
+  .badge{position:absolute;left:10px;top:10px;background:#0d1422cc;border:1px solid #223257;border-radius:999px;padding:4px 8px;
+    font-size:11px;font-weight:800;color:#cfe0ff}
+  .body{padding:12px}
+  .card h3{margin:0 0 6px 0;font-size:16px;line-height:1.2}
+  .desc{color:var(--muted);font-size:12px;min-height:32px}
+  .tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+  .tag{background:#0d1628;border:1px solid #213256;color:#9fb0c7;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:800}
+  .row{display:flex;gap:8px;margin-top:12px}
+  .btn{flex:1;background:linear-gradient(180deg,#1a2233,#0f1522);border:1px solid #1f2a3f;color:var(--ink);
+    border-radius:12px;padding:9px 12px;font-weight:800;cursor:pointer;text-align:center}
+  .btn:hover{filter:brightness(1.08)}
+
+  .empty{opacity:.7;border:1px dashed #223050;border-radius:14px;padding:28px;text-align:center;margin-top:16px}
+  .footer{position:fixed;left:0;right:0;bottom:0;padding:8px 14px;background:linear-gradient(180deg,transparent,rgba(0,0,0,.45));
+    display:flex;justify-content:center;pointer-events:none}
+  .footer .hint{pointer-events:auto;background:#0d1422;border:1px solid #22324f;padding:8px 12px;border-radius:999px;color:var(--muted);
+    font-weight:700}
+
+  @media (max-width:560px){ .actions{flex-wrap:wrap} .search{flex-basis:100%} }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <div class="dot"></div>
+        <div class="title">Harvey’s Project Shelf</div>
+      </div>
+      <div class="actions" style="flex:1;gap:12px">
+        <div class="search" style="flex:1">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:.9"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="q" placeholder="Search title, description, tags… ( / )" />
+        </div>
+      </div>
+    </header>
+
+    <div id="chipbar" class="chipbar"></div>
+
+    <section id="grid" class="grid"></section>
+    <div id="empty" class="empty" style="display:none">No matches. Try clearing search or tags.</div>
+  </div>
+
+  <div class="footer"><div class="hint">Tip: Put your projects in <b>/projects/</b>. Links open in a new tab.</div></div>
+
+<script>
+(function(){
+  'use strict';
+  // --- Preloaded items (edit this list to change your shelf) ---
+  const ITEMS = [
+    {
+      title: 'Aim Rotation Finder',
+      filename: 'Aim Rotation Finder.html',
+      desc: 'Find your natural horizontal aim bias and suggested correction.',
+      tags: ['aim','trainer'],
+      accent: '#66e3c4'
+    },
+    {
+      title: 'Harveys Epic Cycle Tracker',
+      filename: 'Harveys Epic Cycle Tracker.html',
+      desc: 'Clash Royale elixir/cards-in-hand tracker built for Merge Tactics mode.',
+      tags: ['clash','tools'],
+      accent: '#82aaff'
+    },
+    {
+      title: 'Razer 7.1 ABX',
+      filename: 'razer-7.1-abx.html',
+      desc: 'ABX-style tester for surround vs stereo perception.',
+      tags: ['audio','tools'],
+      accent: '#ffa928'
+    },
+    {
+      title: 'Shadow Teacher',
+      filename: 'shadow teacher.html',
+      desc: 'Draw an object and learn how to place its reflections and shadows.',
+      tags: ['art','learning'],
+      accent: '#a6e3a1'
+    },
+    {
+      title: 'Merge 4.1',
+      filename: 'merge4.1.html',
+      desc: 'Experimental Merge mechanics sandbox.',
+      tags: ['prototype','games'],
+      accent: '#f38ba8'
+    }
+  ];
+
+  // --- Icon/thumbnail generator (SVG gradient tile with initials) ---
+  function makeThumbSVG(text, accent){
+    const initials = text.split(/\s+/).map(s=>s[0]||'').join('').slice(0,3).toUpperCase();
+    const id = 'g'+Math.random().toString(36).slice(2,8);
+    return `data:image/svg+xml;charset=utf-8,` + encodeURIComponent(`
+      <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 800 450'>
+        <defs>
+          <linearGradient id='${id}' x1='0' y1='0' x2='1' y2='1'>
+            <stop offset='0' stop-color='${accent}'/>
+            <stop offset='1' stop-color='#1b2a4a'/>
+          </linearGradient>
+        </defs>
+        <rect width='800' height='450' fill='url(#${id})'/>
+        <g font-family='Inter,Segoe UI,Arial' font-weight='900' fill='rgba(255,255,255,0.92)'>
+          <text x='50%' y='52%' font-size='180' text-anchor='middle' dominant-baseline='middle'>${initials}</text>
+        </g>
+      </svg>`);
+  }
+
+  // --- Render ---
+  const grid = document.getElementById('grid');
+  const q = document.getElementById('q');
+  const chipbar = document.getElementById('chipbar');
+  const empty = document.getElementById('empty');
+
+  const allTags = Array.from(new Set(ITEMS.flatMap(i=>i.tags||[]))).sort();
+  let activeTag = null;
+  let query = '';
+
+  function urlFor(filename){
+    // Files live under /projects/ ; preserve original filename with spaces via encodeURIComponent
+    return `./projects/${encodeURIComponent(filename)}`;
+  }
+
+  function renderChips(){
+    chipbar.innerHTML='';
+    if(!allTags.length) return;
+    allTags.forEach(tag=>{
+      const el = document.createElement('div');
+      el.className = 'chip'+(activeTag===tag?' active':'');
+      el.textContent = tag;
+      el.onclick = ()=>{ activeTag = (activeTag===tag?null:tag); render(); };
+      chipbar.appendChild(el);
+    });
+    const clear = document.createElement('div'); clear.className='chip'; clear.textContent='Clear tags';
+    clear.onclick = ()=>{ activeTag=null; render(); };
+    chipbar.appendChild(clear);
+  }
+
+  function match(item){
+    if(activeTag && !(item.tags||[]).includes(activeTag)) return false;
+    if(!query) return true;
+    const hay = `${item.title}\n${item.desc}\n${(item.tags||[]).join(',')}`.toLowerCase();
+    return hay.includes(query);
+  }
+
+  function card(item){
+    const a = document.createElement('a'); a.className='card'; a.href=urlFor(item.filename); a.target='_blank'; a.rel='noopener';
+    const th = document.createElement('div'); th.className='thumb';
+    const img = new Image(); img.src = makeThumbSVG(item.title, item.accent||'#66e3c4'); img.alt='thumbnail'; th.appendChild(img);
+    const b = document.createElement('div'); b.className='badge'; b.textContent = (item.tags?.[0]||'project'); th.appendChild(b);
+    a.appendChild(th);
+
+    const body = document.createElement('div'); body.className='body';
+    const h = document.createElement('h3'); h.textContent = item.title; body.appendChild(h);
+    const d = document.createElement('div'); d.className='desc'; d.textContent = item.desc||''; body.appendChild(d);
+
+    if(item.tags?.length){
+      const tags = document.createElement('div'); tags.className='tags';
+      item.tags.forEach(t=>{ const span=document.createElement('span'); span.className='tag'; span.textContent=t; tags.appendChild(span); });
+      body.appendChild(tags);
+    }
+
+    const row = document.createElement('div'); row.className='row';
+    const btn = document.createElement('div'); btn.className='btn'; btn.textContent='Open'; row.appendChild(btn);
+    body.appendChild(row);
+
+    a.appendChild(body);
+    return a;
+  }
+
+  function render(){
+    grid.innerHTML='';
+    const list = ITEMS.filter(match);
+    if(!list.length){ empty.style.display='block'; return; }
+    empty.style.display='none';
+    list.forEach(it=> grid.appendChild(card(it)));
+  }
+
+  q.addEventListener('input', ()=>{ query = q.value.trim().toLowerCase(); render(); });
+  window.addEventListener('keydown', (e)=>{ if(e.key==='/' && document.activeElement!==q){ e.preventDefault(); q.focus(); } });
+
+  renderChips();
+  render();
+})();
+</script>
+</body>
+</html>
